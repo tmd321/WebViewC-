@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="LineMonitor.App/LineMonitor.App.csproj" />
+  <Project Path="LineMonitor.Core/LineMonitor.Core.csproj" />
+</Solution>

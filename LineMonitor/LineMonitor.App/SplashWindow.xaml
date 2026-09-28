@@ -1,0 +1,27 @@
+<Window x:Class="LineMonitor.App.SplashWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        WindowStyle="None" ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True"
+        WindowStartupLocation="CenterScreen" Width="480" Height="300"
+        Background="{StaticResource BgBrush}">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="0" GlassFrameThickness="0" ResizeBorderThickness="0" CornerRadius="0" />
+    </shell:WindowChrome.WindowChrome>
+
+    <Border BorderBrush="{StaticResource BorderBrush2}" BorderThickness="1">
+        <DockPanel>
+            <!-- 메인창과 같은 톤의 타이틀바 — 스플래시라 버튼은 없음 -->
+            <Border DockPanel.Dock="Top" Background="#2B2F36" Height="28">
+                <TextBlock Text="라인 실시간 모니터링" Foreground="White" FontSize="11" FontWeight="SemiBold"
+                           VerticalAlignment="Center" HorizontalAlignment="Left" Margin="12,0,0,0" />
+            </Border>
+
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <Image Source="/Assets/logo.png" Width="260" Stretch="Uniform" />
+                <TextBlock Text="라인 실시간 모니터링" HorizontalAlignment="Center" Margin="0,18,0,0"
+                           FontSize="13" Style="{StaticResource MutedText}" />
+            </StackPanel>
+        </DockPanel>
+    </Border>
+</Window>

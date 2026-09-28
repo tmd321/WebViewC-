@@ -1,0 +1,38 @@
+<Window x:Class="LineMonitor.App.LineSelectWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="라인 선택" WindowStartupLocation="CenterScreen" ResizeMode="NoResize"
+        WindowStyle="None" Width="420" Height="520" Background="{StaticResource BgBrush}">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="0" GlassFrameThickness="0" ResizeBorderThickness="0" CornerRadius="0" />
+    </shell:WindowChrome.WindowChrome>
+
+    <DockPanel>
+        <!-- 메인창과 같은 톤의 타이틀바. 리사이즈 안 되는 창이라 닫기만 -->
+        <Border DockPanel.Dock="Top" Background="#2B2F36" Height="32" MouseLeftButtonDown="OnTitleBarMouseLeftButtonDown">
+            <Grid>
+                <TextBlock Text="라인 선택" Foreground="White" FontSize="12" FontWeight="SemiBold"
+                           VerticalAlignment="Center" HorizontalAlignment="Left" Margin="12,0,0,0" />
+                <Button Style="{StaticResource TitleBarCloseButton}" Click="OnCloseClick"
+                        HorizontalAlignment="Right" Height="32" ToolTip="닫기">
+                    <Canvas Width="10" Height="10">
+                        <Line X1="0" Y1="0" X2="10" Y2="10" Stroke="White" StrokeThickness="1.3" />
+                        <Line X1="0" Y1="10" X2="10" Y2="0" Stroke="White" StrokeThickness="1.3" />
+                    </Canvas>
+                </Button>
+            </Grid>
+        </Border>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="24">
+                <Image Source="/Assets/logo.png" Height="36" HorizontalAlignment="Center" Margin="0,0,0,16" />
+                <TextBlock Text="모니터링할 라인을 선택하세요" FontSize="15" FontWeight="SemiBold"
+                           HorizontalAlignment="Center" Margin="0,0,0,20" />
+
+                <!-- 동별로 묶어서 한 화면에 다 펼쳐 보여줌(동 > 공정 트리) -->
+                <StackPanel x:Name="TreePanel" />
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

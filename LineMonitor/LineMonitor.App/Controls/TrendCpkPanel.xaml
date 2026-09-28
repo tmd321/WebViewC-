@@ -1,0 +1,62 @@
+<UserControl x:Class="LineMonitor.App.Controls.TrendCpkPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
+             xmlns:vm="clr-namespace:LineMonitor.App.ViewModels">
+    <StackPanel>
+        <TextBlock Text="추세 / CPK" Style="{StaticResource SectionHeaderText}" Margin="0,8,0,4" />
+
+        <ItemsControl ItemsSource="{Binding TrendGroups}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <UniformGrid Columns="4" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:TrendSeriesGroup}">
+                    <Border Style="{StaticResource CardBorder}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding Title}" Style="{StaticResource CardTitleText}" />
+                            <lvc:CartesianChart Series="{Binding Series}" Height="130"
+                                                 LegendPosition="Hidden" TooltipPosition="Hidden" />
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <ItemsControl ItemsSource="{Binding CpkRows}" Margin="0,8,0,0">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <UniformGrid Columns="4" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:CpkCategoryRow}">
+                    <Border Style="{StaticResource CardBorder}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding Title}" Style="{StaticResource CardTitleText}" />
+                            <ItemsControl ItemsSource="{Binding Cells}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Columns="4" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:CpkCell}">
+                                        <StackPanel Margin="4" HorizontalAlignment="Center">
+                                            <TextBlock Text="{Binding Lane, StringFormat='{}{0} Lane'}"
+                                                       Style="{StaticResource MutedText}" HorizontalAlignment="Center" />
+                                            <TextBlock Text="{Binding Value, StringFormat='{}{0:0.000}'}"
+                                                       Style="{StaticResource ValueText}" HorizontalAlignment="Center" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </StackPanel>
+</UserControl>
