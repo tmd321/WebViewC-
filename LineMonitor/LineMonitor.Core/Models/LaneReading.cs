@@ -1,6 +1,10 @@
 namespace LineMonitor.Core.Models;
 
-public sealed record LaneReading(int Lane, decimal? Tolerance, decimal? Insul, decimal? Overlay);
+public sealed record LaneReading(int Lane, decimal? Tolerance, decimal? Insul, decimal? Overlay)
+{
+    public decimal? InsulLeft { get; init; }
+    public decimal? InsulRight { get; init; }
+}
 
 public sealed record LaneMismatch(int Lane, decimal? Left, decimal? Right);
 

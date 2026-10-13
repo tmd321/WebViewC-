@@ -8,12 +8,11 @@ namespace LineMonitor.Core.Lines;
 /// Real Npgsql-backed adapter for 9동 코터(OC9). 스키마 출처: 코터/SQL/CreateTableSQL.txt.
 ///
 /// 확인 필요(가정) 항목:
-/// - pc_index 0=Top, 1=Back으로 가정(overlay_width.cam_pos의 Top=0/Back=1 규칙과 동일하다고 봄).
-///   실접속 후 값 확인 전까지는 추정치.
+/// - frame/mismatch의 pc_index는 error_proofing 정의를 따라 0=TH(Top Wet), 2=BH(Back Wet),
+///   3=BOT(Top Dry), 4=BOB(Back Dry)로 매핑. 실접속 후 기존 화면값과 최종 대조 필요.
 /// - public.frame엔 e_N_tolerance 컬럼이 없음(4동과 다름) — lane_N_null_width(포일/무지부 폭)를
 ///   "Tolerance" 자리에 대신 씀. null_width는 9레인, coat/insul_l/r은 8레인까지만 있음(스키마 자체의
 ///   비대칭 — 여기서 만든 제약 아님).
-/// - Wet(코팅 직후) 단계 컬럼이 없음 — frame의 값(Dry성)에 소폭 지터를 더한 근사치.
 /// - public.cpk 테이블이 없음(4동만 있음) — recipe/recipe_insul의 min/max를 스펙한계로 써서
 ///   CpkCalculator로 직접 계산.
 /// - public.ng.defect_name은 "불량 full path"(이미지 경로) 컬럼 — 사람이 읽는 불량명은
@@ -33,9 +32,22 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
     public LineId LineId => LineId.Dong9Coater;
     public LineProfile Profile => LineProfile.All[LineId.Dong9Coater];
 
-    private static int PcIndexFor(Side side) => side == Side.Top ? 0 : 1;
+    private static int FramePcIndexFor(Side side, Stage stage) => (side, stage) switch
+    {
+        (Side.Top, Stage.Wet) => 0,
+        (Side.Back, Stage.Wet) => 2,
+        (Side.Top, Stage.Dry) => 3,
+        (Side.Back, Stage.Dry) => 4,
+        _ => throw new ArgumentOutOfRangeException()
+    };
 
-    public async Task<FrameSnapshot?> GetLatestFrameAsync(Side side, CancellationToken ct = default)
+    private static int DryPcIndexFor(Side side) => FramePcIndexFor(side, Stage.Dry);
+    private static int MismatchPcIndexFor(Stage stage) => stage == Stage.Wet ? 2 : 4;
+
+    public Task<FrameSnapshot?> GetLatestFrameAsync(Side side, CancellationToken ct = default) =>
+        GetLatestFrameAsync(side, Stage.Dry, ct);
+
+    private async Task<FrameSnapshot?> GetLatestFrameAsync(Side side, Stage stage, CancellationToken ct)
     {
         const string sql = """
             select lot_id, meter, grap_time,
@@ -56,7 +68,7 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
         await using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync(ct);
         await using var cmd = new NpgsqlCommand(sql, conn);
-        cmd.Parameters.AddWithValue("pcIndex", PcIndexFor(side));
+        cmd.Parameters.AddWithValue("pcIndex", FramePcIndexFor(side, stage));
         await using var reader = await cmd.ExecuteReaderAsync(ct);
 
         if (!await reader.ReadAsync(ct))
@@ -69,16 +81,22 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
         {
             var nullWidth = ReadDecimal(reader, $"lane_{lane}_null_width");
             decimal? insul = null;
+            decimal? insulLeft = null;
+            decimal? insulRight = null;
             decimal? coat = null;
             if (lane <= 8)
             {
-                insul = Average(
-                    ReadDecimal(reader, $"lane_{lane}_insul_l_width"),
-                    ReadDecimal(reader, $"lane_{lane}_insul_r_width"));
+                insulLeft = ReadDecimal(reader, $"lane_{lane}_insul_l_width");
+                insulRight = ReadDecimal(reader, $"lane_{lane}_insul_r_width");
+                insul = Average(insulLeft, insulRight);
                 coat = ReadDecimal(reader, $"lane_{lane}_coat_width");
             }
 
-            lanes.Add(new LaneReading(lane, Tolerance: nullWidth, Insul: insul, Overlay: coat));
+            lanes.Add(new LaneReading(lane, Tolerance: nullWidth, Insul: insul, Overlay: coat)
+            {
+                InsulLeft = insulLeft,
+                InsulRight = insulRight
+            });
         }
 
         return new FrameSnapshot(
@@ -91,7 +109,6 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
 
     public async Task<MismatchSnapshot?> GetLatestMismatchAsync(Stage stage, CancellationToken ct = default)
     {
-        // public.mismatch엔 Wet/Dry 단계 구분 컬럼 없음(4동과 동일 한계) — 최신 행을 두 단계 모두에 반환.
         const string sql = """
             select lot_id, grap_time,
                    lane_1_l_mismatch, lane_1_r_mismatch, lane_2_l_mismatch, lane_2_r_mismatch,
@@ -99,6 +116,7 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
                    lane_5_l_mismatch, lane_5_r_mismatch, lane_6_l_mismatch, lane_6_r_mismatch,
                    lane_7_l_mismatch, lane_7_r_mismatch, lane_8_l_mismatch, lane_8_r_mismatch
             from public.mismatch
+            where pc_index = @pcIndex
             order by id desc
             limit 1
             """;
@@ -106,6 +124,7 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
         await using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync(ct);
         await using var cmd = new NpgsqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("pcIndex", MismatchPcIndexFor(stage));
         await using var reader = await cmd.ExecuteReaderAsync(ct);
 
         if (!await reader.ReadAsync(ct))
@@ -131,43 +150,50 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
 
     public async Task<SideMeasurement?> GetSideMeasurementAsync(Side side, CancellationToken ct = default)
     {
-        var frame = await GetLatestFrameAsync(side, ct);
-        if (frame is null)
+        var wetFrame = await GetLatestFrameAsync(side, Stage.Wet, ct);
+        var dryFrame = await GetLatestFrameAsync(side, Stage.Dry, ct);
+        if (wetFrame is null && dryFrame is null)
         {
             return null;
         }
 
-        var edges = frame.Lanes
-            .Select(l => new EdgeReading(
-                l.Lane,
-                Wet: l.Tolerance.HasValue ? l.Tolerance + 0.1m : null,
-                Dry: l.Tolerance,
+        var wetByLane = wetFrame?.Lanes.ToDictionary(lane => lane.Lane) ?? new Dictionary<int, LaneReading>();
+        var dryByLane = dryFrame?.Lanes.ToDictionary(lane => lane.Lane) ?? new Dictionary<int, LaneReading>();
+
+        var edges = Enumerable.Range(1, 9)
+            .Select(lane => new EdgeReading(
+                lane,
+                Wet: wetByLane.GetValueOrDefault(lane)?.Tolerance,
+                Dry: dryByLane.GetValueOrDefault(lane)?.Tolerance,
                 CutLabel: null))
             .ToList();
 
-        var lanes = frame.Lanes
-            .Select(l => new LaneWetDry(
-                l.Lane,
-                Wet: l.Overlay,
-                Dry: l.Overlay.HasValue ? l.Overlay - 0.05m : null,
-                InsulWetLeft: l.Insul, InsulWetRight: l.Insul,
-                InsulDryLeft: l.Insul, InsulDryRight: l.Insul))
+        var lanes = Enumerable.Range(1, 8)
+            .Select(lane => new LaneWetDry(
+                lane,
+                Wet: wetByLane.GetValueOrDefault(lane)?.Overlay,
+                Dry: dryByLane.GetValueOrDefault(lane)?.Overlay,
+                InsulWetLeft: wetByLane.GetValueOrDefault(lane)?.InsulLeft,
+                InsulWetRight: wetByLane.GetValueOrDefault(lane)?.InsulRight,
+                InsulDryLeft: dryByLane.GetValueOrDefault(lane)?.InsulLeft,
+                InsulDryRight: dryByLane.GetValueOrDefault(lane)?.InsulRight))
             .ToList();
 
-        var avrWet = lanes.Count > 0 ? lanes.Average(l => l.Wet ?? 0) : (decimal?)null;
-        var avrDry = lanes.Count > 0 ? lanes.Average(l => l.Dry ?? 0) : (decimal?)null;
+        var avrWet = AverageValues(lanes.Select(lane => lane.Wet));
+        var avrDry = AverageValues(lanes.Select(lane => lane.Dry));
+        var displayFrame = dryFrame ?? wetFrame!;
 
         // 9동 코터는 스트라이프 패턴 코팅 없음(HasPatternCoating:false) — 빈 목록.
-        return new SideMeasurement(frame.LotId, frame.Meter, side, edges, lanes, avrWet, avrDry, Array.Empty<PatternSegment>());
+        return new SideMeasurement(displayFrame.LotId, displayFrame.Meter, side, edges, lanes, avrWet, avrDry, Array.Empty<PatternSegment>());
     }
 
     public async Task<IReadOnlyList<LaneSeries>> GetRecentSeriesAsync(SeriesKind kind, Side side, int take, CancellationToken ct = default)
     {
         return kind switch
         {
-            SeriesKind.Tolerance => await GetFrameColumnSeriesAsync("lane_{0}_null_width", 9, PcIndexFor(side), take, ct),
-            SeriesKind.Overlay => await GetFrameColumnSeriesAsync("lane_{0}_coat_width", 8, PcIndexFor(side), take, ct),
-            SeriesKind.Insul => await GetInsulSeriesAsync(PcIndexFor(side), take, ct),
+            SeriesKind.Tolerance => await GetFrameColumnSeriesAsync("lane_{0}_null_width", 9, DryPcIndexFor(side), take, ct),
+            SeriesKind.Overlay => await GetFrameColumnSeriesAsync("lane_{0}_coat_width", 8, DryPcIndexFor(side), take, ct),
+            SeriesKind.Insul => await GetInsulSeriesAsync(DryPcIndexFor(side), take, ct),
             SeriesKind.Mismatch => await GetMismatchSeriesAsync(take, ct),
             _ => Array.Empty<LaneSeries>()
         };
@@ -276,7 +302,7 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
         foreach (var side in new[] { Side.Top, Side.Back })
         {
             var category = side == Side.Top ? CpkCategory.ToleranceTop : CpkCategory.ToleranceBack;
-            var series = await GetFrameColumnSeriesAsync("lane_{0}_null_width", 9, PcIndexFor(side), SampleTake, ct);
+            var series = await GetFrameColumnSeriesAsync("lane_{0}_null_width", 9, DryPcIndexFor(side), SampleTake, ct);
             foreach (var s in series)
             {
                 var (lsl, usl) = spec.NullWidthRange(s.Lane);
@@ -284,13 +310,13 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
             }
         }
 
-        var insulSeries = await GetInsulSeriesAsync(PcIndexFor(Side.Back), SampleTake, ct);
+        var insulSeries = await GetInsulSeriesAsync(DryPcIndexFor(Side.Back), SampleTake, ct);
         foreach (var s in insulSeries)
         {
             results.Add(new CpkResult(s.Lane, CpkCategory.InsulBack, CpkCalculator.Calculate(Values(s), spec.InsulLsl, spec.InsulUsl)));
         }
 
-        var overlaySeries = await GetFrameColumnSeriesAsync("lane_{0}_coat_width", 8, PcIndexFor(Side.Top), SampleTake, ct);
+        var overlaySeries = await GetFrameColumnSeriesAsync("lane_{0}_coat_width", 8, DryPcIndexFor(Side.Top), SampleTake, ct);
         foreach (var s in overlaySeries)
         {
             var (lsl, usl) = spec.CoatWidthRange(s.Lane);
@@ -496,6 +522,12 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
         if (a is null) return b;
         if (b is null) return a;
         return (a.Value + b.Value) / 2;
+    }
+
+    private static decimal? AverageValues(IEnumerable<decimal?> values)
+    {
+        var actual = values.Where(value => value.HasValue).Select(value => value!.Value).ToList();
+        return actual.Count == 0 ? null : actual.Average();
     }
 
     private static DateTime ParseGrapTime(NpgsqlDataReader reader, string column)
