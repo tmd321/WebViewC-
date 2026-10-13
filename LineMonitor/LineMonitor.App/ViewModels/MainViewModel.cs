@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -25,18 +25,29 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private LineProfile _selectedLine;
 
     [ObservableProperty]
+    private ElectrodeType _selectedElectrode;
+
+    [ObservableProperty]
     private bool _isLive = true;
+
+    public string SelectionDisplayName =>
+        $"{SelectedLine.DisplayName} · {(SelectedElectrode == ElectrodeType.Positive ? "양극" : "음극")}";
 
     public LiveOverviewViewModel LiveOverview { get; } = new();
     public DefectHistoryViewModel DefectHistory { get; } = new();
     public TrendCpkViewModel TrendCpk { get; } = new();
 
-    public MainViewModel(LineAdapterFactory factory, LineMonitorOptions options, LineId? initialLineId = null)
+    public MainViewModel(
+        LineAdapterFactory factory,
+        LineMonitorOptions options,
+        LineId? initialLineId = null,
+        ElectrodeType initialElectrodeType = ElectrodeType.Positive)
     {
         _factory = factory;
         Lines = new ObservableCollection<LineProfile>(LineProfile.All.Values);
         _selectedLine = Lines.First(l => l.LineId == (initialLineId ?? LineId.Dong4Coater));
-        _adapter = _factory.Create(_selectedLine.LineId);
+        _selectedElectrode = initialElectrodeType;
+        _adapter = _factory.Create(_selectedLine.LineId, _selectedElectrode);
 
         _timer = new DispatcherTimer
         {
@@ -48,9 +59,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _ = TickAsync();
     }
 
-    partial void OnSelectedLineChanged(LineProfile value)
+    public void SelectLine(LineId lineId, ElectrodeType electrodeType)
     {
-        _adapter = _factory.Create(value.LineId);
+        SelectedLine = Lines.First(line => line.LineId == lineId);
+        SelectedElectrode = electrodeType;
+        _adapter = _factory.Create(lineId, electrodeType);
+        OnPropertyChanged(nameof(SelectionDisplayName));
         _ = TickAsync();
     }
 

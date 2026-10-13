@@ -46,7 +46,7 @@
             <!-- 단일 셀 Grid: 자식들이 Margin+HorizontalAlignment=Left로 각자 독립 배치됨 -->
             <!-- VS 디자이너에서 이 안의 요소를 마우스로 드래그하면 Margin이 자동으로 갱신됨(MFC 다이얼로그 에디터처럼) -->
             <Grid>
-                <TextBlock Text="{Binding SelectedLine.DisplayName}" FontSize="14" FontWeight="SemiBold"
+                <TextBlock Text="{Binding SelectionDisplayName}" FontSize="14" FontWeight="SemiBold"
                            VerticalAlignment="Center" HorizontalAlignment="Left" Margin="0"
                            Cursor="Hand" ToolTip="더블클릭해서 라인 변경"
                            MouseLeftButtonDown="OnLineNameMouseLeftButtonDown" />

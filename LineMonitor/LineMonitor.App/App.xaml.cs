@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Threading;
 using LineMonitor.App.Services;
 using LineMonitor.App.ViewModels;
@@ -48,13 +48,15 @@ public partial class App : Application
         var picker = new LineSelectWindow();
         var picked = picker.ShowDialog();
 
-        if (picked != true || picker.SelectedLineId is not { } lineId)
+        if (picked != true ||
+            picker.SelectedLineId is not { } lineId ||
+            picker.SelectedElectrodeType is not { } electrodeType)
         {
             Shutdown();
             return;
         }
 
-        var mainViewModel = new MainViewModel(factory, options, lineId);
+        var mainViewModel = new MainViewModel(factory, options, lineId, electrodeType);
         var window = new MainWindow { DataContext = mainViewModel };
 
         ShutdownMode = ShutdownMode.OnMainWindowClose;

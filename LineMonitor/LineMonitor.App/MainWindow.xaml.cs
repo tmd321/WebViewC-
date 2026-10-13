@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
@@ -23,13 +23,13 @@ namespace LineMonitor.App;
 /// The canvas starts empty — the left sidebar lists every box type as a catalog the user
 /// drags (or double-clicks) onto the canvas; already-placed ones show dimmed and can't be
 /// re-added, closing (✕) a card un-dims its row so it can be added back. Position/size/
-/// visibility persist to %LocalAppData%\LineMonitor\layout.json between runs.
+/// visibility persists per site/process/electrode selection under %LocalAppData%\LineMonitor.
 /// </summary>
 public partial class MainWindow : Window
 {
-    private static readonly string LayoutFilePath = Path.Combine(
+    private static readonly string LayoutDirectory = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "LineMonitor", "layout.json");
+        "LineMonitor");
 
     private const double DefaultCardWidth = 480;
     private const double DefaultCardHeight = 420;
@@ -102,19 +102,10 @@ public partial class MainWindow : Window
         _allBoxes.Add(CreateBox("DefectPivot", "개소 x 불량유형",
             BindControl(new Controls.DefectPivotTable(), vm, "DefectHistory")));
 
-        // 처음엔 캔버스가 비어있음 — 좌표는 나중에 드래그/더블클릭으로 놓일 때 쓸 기본값만 계단식으로 미리 잡아둠.
-        for (var i = 0; i < _allBoxes.Count; i++)
-        {
-            var box = _allBoxes[i];
-            box.X = 20 + (i % 3) * (DefaultCardWidth + 20);
-            box.Y = 20 + (i / 3) * (DefaultCardHeight + 20);
-        }
-
         BoxesPanel.ItemsSource = _visibleBoxes;
         CatalogList.ItemsSource = _allBoxes;
-        EmptyCanvasHint.Visibility = Visibility.Visible;
-
-        RestoreSavedLayout();
+        ResetLayout();
+        RestoreSavedLayout(vm);
     }
 
     private static FrameworkElement BindControl(FrameworkElement control, object source, string path)
@@ -529,9 +520,19 @@ public partial class MainWindow : Window
         }
 
         var picker = new LineSelectWindow { Owner = this };
-        if (picker.ShowDialog() == true && picker.SelectedLineId is { } lineId)
+        if (picker.ShowDialog() == true &&
+            picker.SelectedLineId is { } lineId &&
+            picker.SelectedElectrodeType is { } electrodeType)
         {
-            vm.SelectedLine = vm.Lines.First(l => l.LineId == lineId);
+            if (vm.SelectedLine.LineId == lineId && vm.SelectedElectrode == electrodeType)
+            {
+                return;
+            }
+
+            SaveLayout(vm);
+            vm.SelectLine(lineId, electrodeType);
+            ResetLayout();
+            RestoreSavedLayout(vm);
         }
     }
 
@@ -541,16 +542,42 @@ public partial class MainWindow : Window
         SidebarContentColumn.Width = _sidebarExpanded ? new GridLength(228) : new GridLength(0);
     }
 
-    private void RestoreSavedLayout()
+    private static string GetLayoutFilePath(MainViewModel viewModel) =>
+        Path.Combine(LayoutDirectory, $"{viewModel.SelectedLine.LineId}.{viewModel.SelectedElectrode}.layout.json");
+
+    private void ResetLayout()
     {
-        if (!File.Exists(LayoutFilePath))
+        ClearSelection();
+        _visibleBoxes.Clear();
+        _nextZIndex = 1;
+
+        for (var i = 0; i < _allBoxes.Count; i++)
+        {
+            var box = _allBoxes[i];
+            box.IsPlaced = false;
+            box.X = 20 + (i % 3) * (DefaultCardWidth + 20);
+            box.Y = 20 + (i / 3) * (DefaultCardHeight + 20);
+            box.ZIndex = 0;
+
+            if (box.Card is FrameworkElement card)
+            {
+                card.Width = DefaultCardWidth;
+                card.Height = DefaultCardHeight;
+            }
+        }
+    }
+
+    private void RestoreSavedLayout(MainViewModel viewModel)
+    {
+        var layoutFilePath = GetLayoutFilePath(viewModel);
+        if (!File.Exists(layoutFilePath))
         {
             return;
         }
 
         try
         {
-            var state = JsonSerializer.Deserialize<LayoutState>(File.ReadAllText(LayoutFilePath));
+            var state = JsonSerializer.Deserialize<LayoutState>(File.ReadAllText(layoutFilePath));
             if (state is null)
             {
                 return;
@@ -604,9 +631,18 @@ public partial class MainWindow : Window
 
     private void OnClosing(object? sender, CancelEventArgs e)
     {
+        if (DataContext is MainViewModel viewModel)
+        {
+            SaveLayout(viewModel);
+        }
+    }
+
+    private void SaveLayout(MainViewModel viewModel)
+    {
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(LayoutFilePath)!);
+            var layoutFilePath = GetLayoutFilePath(viewModel);
+            Directory.CreateDirectory(LayoutDirectory);
             var state = new LayoutState
             {
                 Visible = _allBoxes.Where(b => b.IsPlaced).Select(b => b.Id).ToList(),
@@ -619,7 +655,7 @@ public partial class MainWindow : Window
                     .Where(b => b.Card is FrameworkElement { Height: var h } && !double.IsNaN(h))
                     .ToDictionary(b => b.Id, b => ((FrameworkElement)b.Card!).Height)
             };
-            File.WriteAllText(LayoutFilePath, JsonSerializer.Serialize(state));
+            File.WriteAllText(layoutFilePath, JsonSerializer.Serialize(state));
         }
         catch
         {

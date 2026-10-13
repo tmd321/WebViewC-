@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="라인 선택" WindowStartupLocation="CenterScreen" ResizeMode="NoResize"
-        WindowStyle="None" Width="420" Height="520" Background="{StaticResource BgBrush}">
+        WindowStyle="None" Width="420" Height="560" Background="{StaticResource BgBrush}">
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="0" GlassFrameThickness="0" ResizeBorderThickness="0" CornerRadius="0" />
     </shell:WindowChrome.WindowChrome>
@@ -27,10 +27,10 @@
         <ScrollViewer VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="24">
                 <Image Source="/Assets/logo.png" Height="36" HorizontalAlignment="Center" Margin="0,0,0,16" />
-                <TextBlock Text="모니터링할 라인을 선택하세요" FontSize="15" FontWeight="SemiBold"
+                <TextBlock Text="사이트, 공정 및 극성을 선택하세요" FontSize="15" FontWeight="SemiBold"
                            HorizontalAlignment="Center" Margin="0,0,0,20" />
 
-                <!-- 동별로 묶어서 한 화면에 다 펼쳐 보여줌(동 > 공정 트리) -->
+                <!-- 사이트 > 공정 > 극성 순서로 선택 -->
                 <StackPanel x:Name="TreePanel" />
             </StackPanel>
         </ScrollViewer>

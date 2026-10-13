@@ -1,9 +1,15 @@
-namespace LineMonitor.Core.Models;
+﻿namespace LineMonitor.Core.Models;
 
 public enum Side
 {
     Top,
     Back
+}
+
+public enum ElectrodeType
+{
+    Positive,
+    Negative
 }
 
 /// <summary>

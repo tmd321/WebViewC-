@@ -1,4 +1,4 @@
-using LineMonitor.Core.Configuration;
+﻿using LineMonitor.Core.Configuration;
 using LineMonitor.Core.Models;
 
 namespace LineMonitor.Core.Lines;
@@ -19,12 +19,13 @@ public sealed class LineAdapterFactory
         _mockSampleImageProvider = mockSampleImageProvider;
     }
 
-    public ILineAdapter Create(LineId lineId)
+    public ILineAdapter Create(LineId lineId, ElectrodeType electrodeType = ElectrodeType.Positive)
     {
         var profile = LineProfile.All[lineId];
+        var connectionString = _options.ConnectionStrings.GetValueOrDefault($"{lineId}.{electrodeType}")
+            ?? _options.ConnectionStrings.GetValueOrDefault(lineId.ToString());
 
         if (!_options.UseMock &&
-            _options.ConnectionStrings.TryGetValue(lineId.ToString(), out var connectionString) &&
             !string.IsNullOrWhiteSpace(connectionString))
         {
             ILineAdapter? real = lineId switch
@@ -45,5 +46,5 @@ public sealed class LineAdapterFactory
     }
 
     public IReadOnlyList<ILineAdapter> CreateAll() =>
-        LineProfile.All.Keys.Select(Create).ToList();
+        LineProfile.All.Keys.Select(lineId => Create(lineId)).ToList();
 }
