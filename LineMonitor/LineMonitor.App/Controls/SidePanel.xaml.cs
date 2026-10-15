@@ -9,6 +9,15 @@ public partial class SidePanel : UserControl
     public static readonly DependencyProperty TitleProperty =
         DependencyProperty.Register(nameof(Title), typeof(string), typeof(SidePanel), new PropertyMetadata("TOP"));
 
+    public static readonly DependencyProperty ShowInsulationProperty =
+        DependencyProperty.Register(nameof(ShowInsulation), typeof(bool), typeof(SidePanel), new PropertyMetadata(true));
+
+    public bool ShowInsulation
+    {
+        get => (bool)GetValue(ShowInsulationProperty);
+        set => SetValue(ShowInsulationProperty, value);
+    }
+
     public string Title
     {
         get => (string)GetValue(TitleProperty);

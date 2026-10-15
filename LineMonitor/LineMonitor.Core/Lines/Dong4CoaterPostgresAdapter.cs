@@ -17,10 +17,12 @@ namespace LineMonitor.Core.Lines;
 public sealed class Dong4CoaterPostgresAdapter : ILineAdapter
 {
     private readonly string _connectionString;
+    private readonly bool _hasInsulation;
 
-    public Dong4CoaterPostgresAdapter(string connectionString)
+    public Dong4CoaterPostgresAdapter(string connectionString, bool hasInsulation = true)
     {
         _connectionString = connectionString;
+        _hasInsulation = hasInsulation;
     }
 
     public LineId LineId => LineId.Dong4Coater;
@@ -28,14 +30,15 @@ public sealed class Dong4CoaterPostgresAdapter : ILineAdapter
 
     public async Task<FrameSnapshot?> GetLatestFrameAsync(Side side, CancellationToken ct = default)
     {
-        const string sql = """
+        var insulColumns = _hasInsulation
+            ? string.Join(", ", Enumerable.Range(1, 4).SelectMany(lane => new[]
+                { $"o.insulation_width_{lane}_lane_left", $"o.insulation_width_{lane}_lane_right" })) + ","
+            : "";
+        var sql = $"""
             select f.lot_id, f.meter, f.grap_time,
                    f.e_1_tolerance, f.e_2_tolerance, f.e_3_tolerance, f.e_4_tolerance,
                    f.e_5_tolerance, f.e_6_tolerance, f.e_7_tolerance, f.e_8_tolerance,
-                   o.insulation_width_1_lane_left, o.insulation_width_1_lane_right,
-                   o.insulation_width_2_lane_left, o.insulation_width_2_lane_right,
-                   o.insulation_width_3_lane_left, o.insulation_width_3_lane_right,
-                   o.insulation_width_4_lane_left, o.insulation_width_4_lane_right,
+                   {insulColumns}
                    o.overlay_width_1_lane_left, o.overlay_width_1_lane_right,
                    o.overlay_width_2_lane_left, o.overlay_width_2_lane_right,
                    o.overlay_width_3_lane_left, o.overlay_width_3_lane_right,
@@ -59,8 +62,8 @@ public sealed class Dong4CoaterPostgresAdapter : ILineAdapter
         var lanes = new List<LaneReading>();
         for (var lane = 1; lane <= 4; lane++)
         {
-            var insulLeft = ReadDecimal(reader, $"insulation_width_{lane}_lane_left");
-            var insulRight = ReadDecimal(reader, $"insulation_width_{lane}_lane_right");
+            var insulLeft = _hasInsulation ? ReadDecimal(reader, $"insulation_width_{lane}_lane_left") : (decimal?)null;
+            var insulRight = _hasInsulation ? ReadDecimal(reader, $"insulation_width_{lane}_lane_right") : (decimal?)null;
             var overlayLeft = ReadDecimal(reader, $"overlay_width_{lane}_lane_left");
             var overlayRight = ReadDecimal(reader, $"overlay_width_{lane}_lane_right");
             var eTolerance = lane <= 8 ? ReadDecimal(reader, $"e_{lane}_tolerance") : null;
@@ -157,6 +160,11 @@ public sealed class Dong4CoaterPostgresAdapter : ILineAdapter
 
     public async Task<IReadOnlyList<LaneSeries>> GetRecentSeriesAsync(SeriesKind kind, Side side, int take, CancellationToken ct = default)
     {
+        if (kind == SeriesKind.Insul && !_hasInsulation)
+        {
+            return Array.Empty<LaneSeries>();
+        }
+
         // Tolerance is stored per E-point (e_1..e_8), not per physical lane — treated as
         // "lane" 1-8 for charting purposes, consistent with the E1..E8 strip in the reference UI.
         if (kind == SeriesKind.Tolerance)
@@ -231,11 +239,13 @@ public sealed class Dong4CoaterPostgresAdapter : ILineAdapter
 
     public async Task<IReadOnlyList<CpkResult>> GetCpkAsync(CancellationToken ct = default)
     {
-        const string sql = """
+        var insulColumns = _hasInsulation
+            ? string.Join(", ", Enumerable.Range(1, 8).Select(lane => $"insulation_{lane}_lane_back_cpk")) + ","
+            : "";
+        var sql = $"""
             select overlay_1_lane_top_cpk, overlay_2_lane_top_cpk, overlay_3_lane_top_cpk, overlay_4_lane_top_cpk,
                    overlay_5_lane_top_cpk, overlay_6_lane_top_cpk, overlay_7_lane_top_cpk, overlay_8_lane_top_cpk,
-                   insulation_1_lane_back_cpk, insulation_2_lane_back_cpk, insulation_3_lane_back_cpk, insulation_4_lane_back_cpk,
-                   insulation_5_lane_back_cpk, insulation_6_lane_back_cpk, insulation_7_lane_back_cpk, insulation_8_lane_back_cpk,
+                   {insulColumns}
                    tolerance_e1_top_cpk, tolerance_e2_top_cpk, tolerance_e3_top_cpk, tolerance_e4_top_cpk,
                    tolerance_e5_top_cpk, tolerance_e6_top_cpk, tolerance_e7_top_cpk, tolerance_e8_top_cpk,
                    tolerance_e1_back_cpk, tolerance_e2_back_cpk, tolerance_e3_back_cpk, tolerance_e4_back_cpk,
@@ -261,7 +271,10 @@ public sealed class Dong4CoaterPostgresAdapter : ILineAdapter
         for (var lane = 1; lane <= 8; lane++)
         {
             results.Add(new CpkResult(lane, CpkCategory.OverlayTop, ReadDouble(reader, $"overlay_{lane}_lane_top_cpk")));
-            results.Add(new CpkResult(lane, CpkCategory.InsulBack, ReadDouble(reader, $"insulation_{lane}_lane_back_cpk")));
+            if (_hasInsulation)
+            {
+                results.Add(new CpkResult(lane, CpkCategory.InsulBack, ReadDouble(reader, $"insulation_{lane}_lane_back_cpk")));
+            }
             results.Add(new CpkResult(lane, CpkCategory.ToleranceTop, ReadDouble(reader, $"tolerance_e{lane}_top_cpk")));
             results.Add(new CpkResult(lane, CpkCategory.ToleranceBack, ReadDouble(reader, $"tolerance_e{lane}_back_cpk")));
             results.Add(new CpkResult(lane, CpkCategory.Mismatch, ReadDouble(reader, $"mismatch_{lane}_lane_cpk")));

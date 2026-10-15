@@ -30,8 +30,8 @@ public sealed class LineAdapterFactory
         {
             ILineAdapter? real = lineId switch
             {
-                LineId.Dong4Coater => new Dong4CoaterPostgresAdapter(connectionString),
-                LineId.Dong9Coater => new Dong9CoaterPostgresAdapter(connectionString),
+                LineId.Dong4Coater => new Dong4CoaterPostgresAdapter(connectionString, electrodeType == ElectrodeType.Positive),
+                LineId.Dong9Coater => new Dong9CoaterPostgresAdapter(connectionString, electrodeType == ElectrodeType.Positive),
                 // 나머지 4개 라인은 phase 2에서 같은 패턴으로 추가.
                 _ => null
             };

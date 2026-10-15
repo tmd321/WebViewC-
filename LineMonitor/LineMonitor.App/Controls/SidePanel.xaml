@@ -3,11 +3,33 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:LineMonitor.Core.Models;assembly=LineMonitor.Core"
              xmlns:conv="clr-namespace:LineMonitor.App.Converters"
-             x:Name="Root">
+             xmlns:controls="clr-namespace:LineMonitor.App.Controls"
+             x:Name="Root" UseLayoutRounding="True" SnapsToDevicePixels="True">
     <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
         <conv:NullToVisibilityConverter x:Key="NullToVis" />
         <conv:CollectionHasItemsConverter x:Key="HasItems" />
         <conv:LengthToWidthConverter x:Key="LenToWidth" />
+        <Style x:Key="LaneMeasurementStrip" TargetType="ItemsControl">
+            <Setter Property="Background" Value="#C0C0C0" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ShowInsulation, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" Value="False">
+                    <Setter Property="Background" Value="#D99A32" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="LaneMeasurementBorder" TargetType="Border">
+            <Setter Property="Background" Value="Black" />
+            <Setter Property="BorderBrush" Value="#C0C0C0" />
+            <Setter Property="BorderThickness" Value="6,0,6,0" />
+            <Setter Property="Padding" Value="4" />
+            <Setter Property="Margin" Value="0,1" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ShowInsulation, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" Value="False">
+                    <Setter Property="BorderBrush" Value="#D99A32" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
 
     <Border Style="{StaticResource PanelBorder}">
@@ -30,7 +52,7 @@
                 </StackPanel>
 
                 <TextBlock Grid.Column="1" Text="{Binding Title, ElementName=Root}"
-                           FontSize="20" FontWeight="Bold" HorizontalAlignment="Center"
+                           FontSize="22" FontWeight="Bold" HorizontalAlignment="Center"
                            Foreground="{StaticResource AccentBrush}" />
 
                 <StackPanel Orientation="Horizontal" Grid.Column="2" HorizontalAlignment="Right">
@@ -58,14 +80,14 @@
                                 <Border Background="{StaticResource AccentBrush}" Height="28" Margin="1" CornerRadius="2"
                                         Width="{Binding CoatLength, Converter={StaticResource LenToWidth}}"
                                         ToolTip="{Binding CoatLength, StringFormat='Coat {0:0.0}mm'}">
-                                    <TextBlock Text="{Binding Index, StringFormat='P{0}'}" Foreground="White" FontSize="9"
+                                    <TextBlock Text="{Binding Index, StringFormat='P{0}'}" Foreground="White" FontSize="11"
                                                FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
                                 <Border Background="{StaticResource BorderBrush2}" Height="28" Margin="1" CornerRadius="2"
                                         Width="{Binding FoilLength, Converter={StaticResource LenToWidth}, ConverterParameter=1.5}"
                                         Visibility="{Binding FoilLength, Converter={StaticResource NullToVis}}"
                                         ToolTip="{Binding FoilLength, StringFormat='Foil {0:0.0}mm'}">
-                                    <TextBlock Text="Foil" Foreground="{StaticResource MutedBrush}" FontSize="8"
+                                    <TextBlock Text="Foil" Foreground="{StaticResource MutedBrush}" FontSize="10"
                                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
                             </StackPanel>
@@ -74,11 +96,21 @@
                 </ItemsControl>
             </Border>
 
-            <!-- 레인 사이 간격(에지) tolerance / 컷폭 라벨 -->
-            <ItemsControl ItemsSource="{Binding Edges}">
+            <!-- 무지부와 코팅 레인은 같은 가로 폭을 사용하고 평균 영역은 따로 둔다. -->
+            <Grid Margin="24,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="90" />
+                </Grid.ColumnDefinitions>
+
+            <ItemsControl Grid.Row="0" Grid.Column="0" ItemsSource="{Binding Edges}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <UniformGrid Rows="1" />
+                        <controls:LaneBoundaryPanel />
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
@@ -88,24 +120,17 @@
                                        Foreground="{StaticResource WarnBrush}" HorizontalAlignment="Center"
                                        Visibility="{Binding CutLabel, Converter={StaticResource NullToVis}}" />
                             <TextBlock Text="{Binding Wet, StringFormat='{}{0:0.00}'}" Style="{StaticResource MutedText}"
-                                       HorizontalAlignment="Center"
+                                       FontWeight="Bold" FontSize="14" HorizontalAlignment="Center"
                                        Visibility="{Binding CutLabel, Converter={StaticResource NullToVis}, ConverterParameter=Invert}" />
                             <TextBlock Text="{Binding Dry, StringFormat='{}{0:0.00}'}" Style="{StaticResource MutedText}"
-                                       HorizontalAlignment="Center"
+                                       FontWeight="Bold" FontSize="14" HorizontalAlignment="Center"
                                        Visibility="{Binding CutLabel, Converter={StaticResource NullToVis}, ConverterParameter=Invert}" />
                         </StackPanel>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <!-- 레인 셀(Wet/Dry 누적 + 절연 좌우) + Avr -->
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="90" />
-                </Grid.ColumnDefinitions>
-
-                <ItemsControl Grid.Column="0" ItemsSource="{Binding Lanes}">
+                <ItemsControl Grid.Row="1" Grid.Column="0" ItemsSource="{Binding Lanes}" Style="{StaticResource LaneMeasurementStrip}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <UniformGrid Rows="1" />
@@ -113,19 +138,21 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type vm:LaneWetDry}">
-                            <Border Background="Black" Margin="1" Padding="4" CornerRadius="2">
+                            <Border Style="{StaticResource LaneMeasurementBorder}">
                                 <StackPanel>
                                     <TextBlock Text="{Binding Wet, StringFormat='{}{0:0.00}'}" Foreground="White"
-                                               FontWeight="Bold" FontSize="14" HorizontalAlignment="Center" />
+                                               FontWeight="Bold" FontSize="16" HorizontalAlignment="Center" />
                                     <TextBlock Text="{Binding Dry, StringFormat='{}{0:0.00}'}" Foreground="#FFD940"
-                                               FontWeight="Bold" FontSize="14" HorizontalAlignment="Center" />
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,0">
-                                        <TextBlock Text="{Binding InsulWetLeft, StringFormat='{}{0:0.00}'}" Foreground="#8B96AB" FontSize="9" Margin="0,0,2,0" />
-                                        <TextBlock Text="{Binding InsulWetRight, StringFormat='{}{0:0.00}'}" Foreground="#8B96AB" FontSize="9" />
+                                               FontWeight="Bold" FontSize="16" HorizontalAlignment="Center" />
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,0"
+                                                Visibility="{Binding ShowInsulation, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="{Binding InsulWetLeft, StringFormat='{}{0:0.00}'}" Foreground="#8B96AB" FontSize="11" Margin="0,0,2,0" />
+                                        <TextBlock Text="{Binding InsulWetRight, StringFormat='{}{0:0.00}'}" Foreground="#8B96AB" FontSize="11" />
                                     </StackPanel>
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <TextBlock Text="{Binding InsulDryLeft, StringFormat='{}{0:0.00}'}" Foreground="#FFD940" FontSize="9" Margin="0,0,2,0" />
-                                        <TextBlock Text="{Binding InsulDryRight, StringFormat='{}{0:0.00}'}" Foreground="#FFD940" FontSize="9" />
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"
+                                                Visibility="{Binding ShowInsulation, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="{Binding InsulDryLeft, StringFormat='{}{0:0.00}'}" Foreground="#FFD940" FontSize="11" Margin="0,0,2,0" />
+                                        <TextBlock Text="{Binding InsulDryRight, StringFormat='{}{0:0.00}'}" Foreground="#FFD940" FontSize="11" />
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
@@ -133,10 +160,10 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <StackPanel Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <TextBlock Text="Avr." Style="{StaticResource MutedText}" HorizontalAlignment="Center" />
-                    <TextBlock Text="{Binding AvrWet, StringFormat='{}{0:0.00} (wet)'}" FontSize="11" HorizontalAlignment="Center" />
-                    <TextBlock Text="{Binding AvrDry, StringFormat='{}{0:0.00} (dry)'}" FontSize="11" Foreground="#FFD940" HorizontalAlignment="Center" />
+                <StackPanel Grid.Row="1" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock Text="Avr." Style="{StaticResource MutedText}" FontSize="14" Foreground="Black" FontWeight="Bold" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding AvrWet, StringFormat='{}{0:0.00} (wet)'}" FontSize="15" Foreground="Black" FontWeight="Bold" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding AvrDry, StringFormat='{}{0:0.00} (dry)'}" FontSize="15" Foreground="Black" FontWeight="Bold" HorizontalAlignment="Center" />
                 </StackPanel>
             </Grid>
         </StackPanel>

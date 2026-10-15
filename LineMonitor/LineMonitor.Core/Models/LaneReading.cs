@@ -13,7 +13,10 @@ public sealed record FrameSnapshot(
     string Meter,
     Side Side,
     IReadOnlyList<LaneReading> Lanes,
-    DateTime GrabTime);
+    DateTime GrabTime)
+{
+    public int? LaneCount { get; init; }
+}
 
 public sealed record MismatchSnapshot(
     string LotId,

@@ -58,7 +58,7 @@
                 <Setter Property="Background" Value="Transparent" />
                 <Setter Property="Foreground" Value="White" />
                 <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
-                <Setter Property="FontSize" Value="10" />
+                <Setter Property="FontSize" Value="12" />
                 <Setter Property="BorderThickness" Value="0" />
                 <Setter Property="Cursor" Value="Hand" />
                 <Setter Property="Template">
@@ -83,7 +83,7 @@
                 <Setter Property="Background" Value="Transparent" />
                 <Setter Property="Foreground" Value="White" />
                 <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
-                <Setter Property="FontSize" Value="10" />
+                <Setter Property="FontSize" Value="12" />
                 <Setter Property="BorderThickness" Value="0" />
                 <Setter Property="Cursor" Value="Hand" />
                 <Setter Property="Template">
@@ -105,7 +105,7 @@
             <!-- 상단바 Live 토글 버튼: 기본 WPF 버튼 크롬 대신 테마 색 맞춘 둥근 알약 버튼 -->
             <Style x:Key="PillButton" TargetType="Button">
                 <Setter Property="Cursor" Value="Hand" />
-                <Setter Property="FontSize" Value="12" />
+                <Setter Property="FontSize" Value="14" />
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
                 <Setter Property="Padding" Value="14,6" />
@@ -170,6 +170,7 @@
 
             <!-- 라인 선택 창 타일: 둥근 카드 + hover 시 살짝 뜨는 느낌(그림자/테두리 강조) -->
             <Style TargetType="Window">
+                <Setter Property="FontSize" Value="14" />
                 <Setter Property="Background" Value="{StaticResource BgBrush}" />
                 <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
             </Style>
@@ -179,25 +180,25 @@
             </Style>
 
             <Style x:Key="SectionHeaderText" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="14" />
+                <Setter Property="FontSize" Value="16" />
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
             </Style>
 
             <Style x:Key="CardTitleText" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="12" />
+                <Setter Property="FontSize" Value="14" />
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="Margin" Value="0,0,0,4" />
                 <Setter Property="HorizontalAlignment" Value="Center" />
             </Style>
 
             <Style x:Key="MutedText" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="10" />
+                <Setter Property="FontSize" Value="12" />
                 <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
             </Style>
 
             <Style x:Key="ValueText" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="12" />
+                <Setter Property="FontSize" Value="14" />
                 <Setter Property="FontWeight" Value="SemiBold" />
             </Style>
 

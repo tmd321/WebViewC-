@@ -14,9 +14,11 @@ public sealed partial class TrendCpkViewModel : ObservableObject
 {
     public ObservableCollection<TrendSeriesGroup> TrendGroups { get; } = new();
     public ObservableCollection<CpkCategoryRow> CpkRows { get; } = new();
+    public bool ShowInsulation { get; set; } = true;
 
     public async Task RefreshAsync(ILineAdapter adapter, CancellationToken ct = default)
     {
+        var showInsulation = ShowInsulation;
         var kinds = new (SeriesKind Kind, Side Side, string Title)[]
         {
             (SeriesKind.Tolerance, Side.Top, "Tolerance Top"),
@@ -29,6 +31,11 @@ public sealed partial class TrendCpkViewModel : ObservableObject
         var newGroups = new List<TrendSeriesGroup>();
         foreach (var (kind, side, title) in kinds)
         {
+            if (kind == SeriesKind.Insul && !showInsulation)
+            {
+                continue;
+            }
+
             var laneSeries = await adapter.GetRecentSeriesAsync(kind, side, 60, ct);
             var group = new TrendSeriesGroup { Title = title };
             foreach (var ls in laneSeries)
@@ -50,8 +57,14 @@ public sealed partial class TrendCpkViewModel : ObservableObject
             newGroups.Add(group);
         }
 
+        if (showInsulation != ShowInsulation)
+        {
+            return;
+        }
+
         var cpk = await adapter.GetCpkAsync(ct);
         var newRows = cpk
+            .Where(c => showInsulation || (c.Category != CpkCategory.InsulTop && c.Category != CpkCategory.InsulBack))
             .GroupBy(c => c.Category)
             .Select(g =>
             {
@@ -64,6 +77,11 @@ public sealed partial class TrendCpkViewModel : ObservableObject
                 return row;
             })
             .ToList();
+
+        if (showInsulation != ShowInsulation)
+        {
+            return;
+        }
 
         TrendGroups.Clear();
         foreach (var g in newGroups) TrendGroups.Add(g);

@@ -26,7 +26,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private LineProfile _selectedLine;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowInsulation))]
     private ElectrodeType _selectedElectrode;
+
+    public bool ShowInsulation => SelectedElectrode == ElectrodeType.Positive;
 
     [ObservableProperty]
     private bool _isLive = true;
@@ -48,6 +51,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         Lines = new ObservableCollection<LineProfile>(LineProfile.All.Values);
         _selectedLine = Lines.First(l => l.LineId == (initialLineId ?? LineId.Dong4Coater));
         _selectedElectrode = initialElectrodeType;
+        TrendCpk.ShowInsulation = ShowInsulation;
         _adapter = _factory.Create(_selectedLine.LineId, _selectedElectrode);
 
         _timer = new DispatcherTimer
@@ -64,6 +68,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         SelectedLine = Lines.First(line => line.LineId == lineId);
         SelectedElectrode = electrodeType;
+        TrendCpk.ShowInsulation = ShowInsulation;
+        TrendCpk.TrendGroups.Clear();
+        TrendCpk.CpkRows.Clear();
         _adapter = _factory.Create(lineId, electrodeType);
         OnPropertyChanged(nameof(SelectionDisplayName));
         _ = TickAsync();
@@ -81,7 +88,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             var adapter = _adapter;
             await LiveOverview.RefreshAsync(adapter);
+            if (!ReferenceEquals(adapter, _adapter)) return;
             await DefectHistory.RefreshAsync(adapter);
+            if (!ReferenceEquals(adapter, _adapter)) return;
             await TrendCpk.RefreshAsync(adapter);
         }
         catch

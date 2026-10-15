@@ -110,6 +110,18 @@ public partial class MainWindow : Window
 
     private static FrameworkElement BindControl(FrameworkElement control, object source, string path)
     {
+        if (control is Controls.SidePanel sidePanel)
+        {
+            sidePanel.SetBinding(Controls.SidePanel.ShowInsulationProperty,
+                new Binding(nameof(MainViewModel.ShowInsulation)) { Source = source });
+        }
+
+        if (control is Controls.MismatchPanel mismatchPanel)
+        {
+            mismatchPanel.SetBinding(Controls.MismatchPanel.IsPositiveElectrodeProperty,
+                new Binding(nameof(MainViewModel.ShowInsulation)) { Source = source });
+        }
+
         control.SetBinding(DataContextProperty, new Binding(path) { Source = source });
         return control;
     }
@@ -135,7 +147,7 @@ public partial class MainWindow : Window
         var anchorBadge = new TextBlock
         {
             Text = "기준",
-            FontSize = 10,
+            FontSize = 12,
             FontWeight = FontWeights.Bold,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(6, 0, 0, 0),
@@ -156,7 +168,7 @@ public partial class MainWindow : Window
             Width = 22,
             Height = 22,
             Padding = new Thickness(0),
-            FontSize = 11,
+            FontSize = 13,
             VerticalAlignment = VerticalAlignment.Center,
             ToolTip = "가로 기본 크기로"
         };
@@ -168,7 +180,7 @@ public partial class MainWindow : Window
             Width = 22,
             Height = 22,
             Padding = new Thickness(0),
-            FontSize = 11,
+            FontSize = 13,
             VerticalAlignment = VerticalAlignment.Center,
             ToolTip = "세로 기본 크기로"
         };
@@ -180,7 +192,7 @@ public partial class MainWindow : Window
             Width = 22,
             Height = 22,
             Padding = new Thickness(0),
-            FontSize = 11,
+            FontSize = 13,
             VerticalAlignment = VerticalAlignment.Center,
             ToolTip = "닫기 (사이드바에서 다시 추가 가능)"
         };

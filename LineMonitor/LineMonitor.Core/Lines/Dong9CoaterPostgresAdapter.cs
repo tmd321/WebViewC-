@@ -23,10 +23,12 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
     private const int SampleTake = 30;
 
     private readonly string _connectionString;
+    private readonly bool _hasInsulation;
 
-    public Dong9CoaterPostgresAdapter(string connectionString)
+    public Dong9CoaterPostgresAdapter(string connectionString, bool hasInsulation = true)
     {
         _connectionString = connectionString;
+        _hasInsulation = hasInsulation;
     }
 
     public LineId LineId => LineId.Dong9Coater;
@@ -49,16 +51,17 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
 
     private async Task<FrameSnapshot?> GetLatestFrameAsync(Side side, Stage stage, CancellationToken ct)
     {
-        const string sql = """
-            select lot_id, meter, grap_time,
+        var insulColumns = _hasInsulation
+            ? ", " + string.Join(", ", Enumerable.Range(1, 8).SelectMany(lane => new[]
+                { $"lane_{lane}_insul_l_width", $"lane_{lane}_insul_r_width" }))
+            : "";
+        var sql = $"""
+            select lot_id, meter, grap_time, lane_count,
                    lane_1_null_width, lane_2_null_width, lane_3_null_width, lane_4_null_width,
                    lane_5_null_width, lane_6_null_width, lane_7_null_width, lane_8_null_width, lane_9_null_width,
                    lane_1_coat_width, lane_2_coat_width, lane_3_coat_width, lane_4_coat_width,
-                   lane_5_coat_width, lane_6_coat_width, lane_7_coat_width, lane_8_coat_width,
-                   lane_1_insul_l_width, lane_2_insul_l_width, lane_3_insul_l_width, lane_4_insul_l_width,
-                   lane_5_insul_l_width, lane_6_insul_l_width, lane_7_insul_l_width, lane_8_insul_l_width,
-                   lane_1_insul_r_width, lane_2_insul_r_width, lane_3_insul_r_width, lane_4_insul_r_width,
-                   lane_5_insul_r_width, lane_6_insul_r_width, lane_7_insul_r_width, lane_8_insul_r_width
+                   lane_5_coat_width, lane_6_coat_width, lane_7_coat_width, lane_8_coat_width
+                   {insulColumns}
             from public.frame
             where pc_index = @pcIndex
             order by id desc
@@ -86,9 +89,12 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
             decimal? coat = null;
             if (lane <= 8)
             {
-                insulLeft = ReadDecimal(reader, $"lane_{lane}_insul_l_width");
-                insulRight = ReadDecimal(reader, $"lane_{lane}_insul_r_width");
-                insul = Average(insulLeft, insulRight);
+                if (_hasInsulation)
+                {
+                    insulLeft = ReadDecimal(reader, $"lane_{lane}_insul_l_width");
+                    insulRight = ReadDecimal(reader, $"lane_{lane}_insul_r_width");
+                    insul = Average(insulLeft, insulRight);
+                }
                 coat = ReadDecimal(reader, $"lane_{lane}_coat_width");
             }
 
@@ -104,7 +110,12 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
             Meter: reader.IsDBNull(reader.GetOrdinal("meter")) ? "" : reader.GetString(reader.GetOrdinal("meter")),
             Side: side,
             Lanes: lanes,
-            GrabTime: ParseGrapTime(reader, "grap_time"));
+            GrabTime: ParseGrapTime(reader, "grap_time"))
+        {
+            LaneCount = reader.IsDBNull(reader.GetOrdinal("lane_count"))
+                ? null
+                : reader.GetInt32(reader.GetOrdinal("lane_count"))
+        };
     }
 
     public async Task<MismatchSnapshot?> GetLatestMismatchAsync(Stage stage, CancellationToken ct = default)
@@ -159,8 +170,10 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
 
         var wetByLane = wetFrame?.Lanes.ToDictionary(lane => lane.Lane) ?? new Dictionary<int, LaneReading>();
         var dryByLane = dryFrame?.Lanes.ToDictionary(lane => lane.Lane) ?? new Dictionary<int, LaneReading>();
+        var displayFrame = dryFrame ?? wetFrame!;
+        var laneCount = Math.Clamp(displayFrame.LaneCount ?? 8, 1, 8);
 
-        var edges = Enumerable.Range(1, 9)
+        var edges = Enumerable.Range(1, laneCount + 1)
             .Select(lane => new EdgeReading(
                 lane,
                 Wet: wetByLane.GetValueOrDefault(lane)?.Tolerance,
@@ -168,7 +181,7 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
                 CutLabel: null))
             .ToList();
 
-        var lanes = Enumerable.Range(1, 8)
+        var lanes = Enumerable.Range(1, laneCount)
             .Select(lane => new LaneWetDry(
                 lane,
                 Wet: wetByLane.GetValueOrDefault(lane)?.Overlay,
@@ -181,7 +194,6 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
 
         var avrWet = AverageValues(lanes.Select(lane => lane.Wet));
         var avrDry = AverageValues(lanes.Select(lane => lane.Dry));
-        var displayFrame = dryFrame ?? wetFrame!;
 
         // 9동 코터는 스트라이프 패턴 코팅 없음(HasPatternCoating:false) — 빈 목록.
         return new SideMeasurement(displayFrame.LotId, displayFrame.Meter, side, edges, lanes, avrWet, avrDry, Array.Empty<PatternSegment>());
@@ -193,7 +205,9 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
         {
             SeriesKind.Tolerance => await GetFrameColumnSeriesAsync("lane_{0}_null_width", 9, DryPcIndexFor(side), take, ct),
             SeriesKind.Overlay => await GetFrameColumnSeriesAsync("lane_{0}_coat_width", 8, DryPcIndexFor(side), take, ct),
-            SeriesKind.Insul => await GetInsulSeriesAsync(DryPcIndexFor(side), take, ct),
+            SeriesKind.Insul => _hasInsulation
+                ? await GetInsulSeriesAsync(DryPcIndexFor(side), take, ct)
+                : Array.Empty<LaneSeries>(),
             SeriesKind.Mismatch => await GetMismatchSeriesAsync(take, ct),
             _ => Array.Empty<LaneSeries>()
         };
@@ -310,10 +324,13 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
             }
         }
 
-        var insulSeries = await GetInsulSeriesAsync(DryPcIndexFor(Side.Back), SampleTake, ct);
-        foreach (var s in insulSeries)
+        if (_hasInsulation)
         {
-            results.Add(new CpkResult(s.Lane, CpkCategory.InsulBack, CpkCalculator.Calculate(Values(s), spec.InsulLsl, spec.InsulUsl)));
+            var insulSeries = await GetInsulSeriesAsync(DryPcIndexFor(Side.Back), SampleTake, ct);
+            foreach (var s in insulSeries)
+            {
+                results.Add(new CpkResult(s.Lane, CpkCategory.InsulBack, CpkCalculator.Calculate(Values(s), spec.InsulLsl, spec.InsulUsl)));
+            }
         }
 
         var overlaySeries = await GetFrameColumnSeriesAsync("lane_{0}_coat_width", 8, DryPcIndexFor(Side.Top), SampleTake, ct);
@@ -397,8 +414,9 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
             limit 1
             """;
 
-        await using (var conn = new NpgsqlConnection(_connectionString))
+        if (_hasInsulation)
         {
+            await using var conn = new NpgsqlConnection(_connectionString);
             await conn.OpenAsync(ct);
             await using var cmd = new NpgsqlCommand(insulSql, conn);
             await using var reader = await cmd.ExecuteReaderAsync(ct);
