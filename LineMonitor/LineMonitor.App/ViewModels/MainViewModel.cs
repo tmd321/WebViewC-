@@ -18,6 +18,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly LineAdapterFactory _factory;
     private readonly DispatcherTimer _timer;
     private ILineAdapter _adapter;
+    private bool _isRefreshing;
 
     public ObservableCollection<LineProfile> Lines { get; }
 
@@ -70,11 +71,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private async Task TickAsync()
     {
-        if (!IsLive)
+        if (!IsLive || _isRefreshing)
         {
             return;
         }
 
+        _isRefreshing = true;
         try
         {
             var adapter = _adapter;
@@ -86,6 +88,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             // 라인 오프라인/쿼리 실패는 다음 tick에서 재시도 — MVP 단계에서는 조용히 무시,
             // phase 3에서 라인별 연결 상태 배지로 노출 예정.
+        }
+        finally
+        {
+            _isRefreshing = false;
         }
     }
 
