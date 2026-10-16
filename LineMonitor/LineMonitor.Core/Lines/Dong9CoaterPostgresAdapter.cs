@@ -1,6 +1,7 @@
 using LineMonitor.Core.Cpk;
 using LineMonitor.Core.Models;
 using Npgsql;
+using System.Globalization;
 
 namespace LineMonitor.Core.Lines;
 
@@ -16,7 +17,7 @@ namespace LineMonitor.Core.Lines;
 /// - public.cpk 테이블이 없음(4동만 있음) — recipe/recipe_insul의 min/max를 스펙한계로 써서
 ///   CpkCalculator로 직접 계산.
 /// - public.ng.defect_name은 "불량 full path"(이미지 경로) 컬럼 — 사람이 읽는 불량명은
-///   defect_code.defect_type_name_ko에서 조인해서 가져옴.
+///   defect_code의 한글명(컬럼이 있는 경우), 영문명 순서로 가져옴.
 /// </summary>
 public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
 {
@@ -432,39 +433,39 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
 
     public async Task<IReadOnlyList<DefectRecord>> GetRecentDefectsAsync(int take, long sinceId = 0, CancellationToken ct = default)
     {
-        var sql = sinceId > 0
-            ? """
-                select n.id, n.defect_time, n.lot_id, n.lane, n.defect_type_code, d.defect_type_name_ko,
-                       n.pos_x, n.pos_y, n.size_x, n.size_y, n.defect_name
-                from public.ng n
-                left join public.defect_code d on d.defect_type_code = n.defect_type_code
-                where n.id > @sinceId
-                order by n.id asc
-                limit @take
-                """
-            : """
-                select n.id, n.defect_time, n.lot_id, n.lane, n.defect_type_code, d.defect_type_name_ko,
-                       n.pos_x, n.pos_y, n.size_x, n.size_y, n.defect_name
-                from public.ng n
-                left join public.defect_code d on d.defect_type_code = n.defect_type_code
-                order by n.id desc
-                limit @take
-                """;
+        var order = sinceId > 0 ? "asc" : "desc";
+        var sql = $"""
+            with latest_lot as (
+                select lot_id from public.ng
+                where lot_id is not null
+                order by id desc limit 1
+            )
+            select n.id, n.defect_time, n.lot_id, n.lane, n.pc_index, n.defect_type_code,
+                   coalesce(d.defect_type_name, '') as defect_type_name,
+                   coalesce(nullif(to_jsonb(d)->>'defect_type_name_ko', ''), nullif(d.defect_type_name, ''),
+                            '코드 ' || n.defect_type_code::text, '미분류') as defect_type_name_ko,
+                   n.pos_x, n.pos_y, n.pos_full_x, n.pos_full_y, n.size_x, n.size_y, n.defect_name
+            from public.ng n
+            join latest_lot l on l.lot_id = n.lot_id
+            left join public.defect_code d on d.defect_type_code = n.defect_type_code
+            where n.id > @sinceId
+            order by n.id {order}
+            limit @take
+            """;
 
         await using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync(ct);
         await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("take", take);
-        if (sinceId > 0)
-        {
-            cmd.Parameters.AddWithValue("sinceId", sinceId);
-        }
+        cmd.Parameters.AddWithValue("sinceId", sinceId);
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
 
         var records = new List<DefectRecord>();
         while (await reader.ReadAsync(ct))
         {
+            var pcIndex = reader.IsDBNull(reader.GetOrdinal("pc_index"))
+                ? (int?)null : reader.GetInt32(reader.GetOrdinal("pc_index"));
             records.Add(new DefectRecord(
                 Id: reader.GetInt32(reader.GetOrdinal("id")),
                 Time: ParseGrapTime(reader, "defect_time"),
@@ -476,7 +477,14 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
                 PosX: ReadDecimal(reader, "pos_x"),
                 PosY: ReadDecimal(reader, "pos_y"),
                 SizeX: ReadDecimal(reader, "size_x"),
-                SizeY: ReadDecimal(reader, "size_y")));
+                SizeY: ReadDecimal(reader, "size_y"))
+            {
+                PcIndex = pcIndex,
+                Location = DefectLocationFor(pcIndex),
+                DefectTypeName = reader.GetString(reader.GetOrdinal("defect_type_name")),
+                PosFullX = ReadDecimal(reader, "pos_full_x"),
+                PosFullY = ReadDecimal(reader, "pos_full_y")
+            });
         }
 
         return records;
@@ -484,14 +492,20 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
 
     public async Task<IReadOnlyList<DefectPivotRow>> GetDefectPivotAsync(CancellationToken ct = default)
     {
-        // ng엔 개소(위치) 구분 컬럼이 pc_index뿐 — Top/Back 2행으로만 집계 가능
-        // (레퍼런스 화면의 세부 개소 6종 구분은 이 스키마로는 불가).
         const string sql = """
-            select n.pc_index, d.defect_type_name_ko, count(*) as cnt
+            with latest_lot as (
+                select lot_id from public.ng
+                where lot_id is not null
+                order by id desc limit 1
+            )
+            select n.lot_id, n.pc_index,
+                   coalesce(nullif(to_jsonb(d)->>'defect_type_name_ko', ''), nullif(d.defect_type_name, ''),
+                            '코드 ' || n.defect_type_code::text, '미분류') as defect_type_name,
+                   count(*) as cnt
             from public.ng n
+            join latest_lot l on l.lot_id = n.lot_id
             left join public.defect_code d on d.defect_type_code = n.defect_type_code
-            where n.defect_time > (now() - interval '1 day')::text
-            group by n.pc_index, d.defect_type_name_ko
+            group by 1, 2, 3
             """;
 
         await using var conn = new NpgsqlConnection(_connectionString);
@@ -499,23 +513,43 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
         await using var cmd = new NpgsqlCommand(sql, conn);
         await using var reader = await cmd.ExecuteReaderAsync(ct);
 
-        var topCounts = new Dictionary<string, int>();
-        var backCounts = new Dictionary<string, int>();
+        var countsByLocation = new[] { 0, 2, 3, 4 }
+            .ToDictionary(pcIndex => DefectLocationFor(pcIndex), _ => new Dictionary<string, int>());
+        var lotId = "-";
         while (await reader.ReadAsync(ct))
         {
-            var pcIndex = reader.IsDBNull(0) ? -1 : reader.GetInt32(0);
-            var name = reader.IsDBNull(1) ? "UNKNOWN" : reader.GetString(1);
-            var count = (int)reader.GetInt64(2);
-            var target = pcIndex == 0 ? topCounts : backCounts;
-            target[name] = count;
+            lotId = reader.GetString(0);
+            var pcIndex = reader.IsDBNull(1) ? (int?)null : reader.GetInt32(1);
+            var location = DefectLocationFor(pcIndex);
+            var name = reader.GetString(2);
+            var count = checked((int)reader.GetInt64(3));
+            if (!countsByLocation.TryGetValue(location, out var counts))
+            {
+                counts = new Dictionary<string, int>();
+                countsByLocation.Add(location, counts);
+            }
+            counts[name] = counts.GetValueOrDefault(name) + count;
         }
 
-        return new[]
+        var types = countsByLocation.Values.SelectMany(counts => counts.Keys).Distinct().ToList();
+        foreach (var counts in countsByLocation.Values)
         {
-            new DefectPivotRow("Top", topCounts),
-            new DefectPivotRow("Back", backCounts)
-        };
+            foreach (var type in types) counts.TryAdd(type, 0);
+        }
+
+        return countsByLocation.Select(pair =>
+            new DefectPivotRow(pair.Key, pair.Value) { LotId = lotId }).ToList();
     }
+
+    private static string DefectLocationFor(int? pcIndex) => pcIndex switch
+    {
+        0 => "MM Top (Top Head)",
+        2 => "MM Back (Back Head)",
+        3 => "MM Top (Back Outfeed)",
+        4 => "MM Back (Back Outfeed)",
+        null => "개소 미지정",
+        _ => $"PC {pcIndex}"
+    };
 
     private static decimal? ReadDecimal(NpgsqlDataReader reader, string column)
     {
@@ -557,6 +591,8 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
         }
 
         var raw = reader.GetString(ordinal);
+        if (DateTime.TryParseExact(raw, "yyyyMMddHHmmssfff", CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out var grabTime)) return grabTime;
         return DateTime.TryParse(raw, out var parsed) ? parsed : DateTime.MinValue;
     }
 }

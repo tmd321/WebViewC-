@@ -28,19 +28,33 @@ public sealed class NullToVisibilityConverter : IValueConverter
 public sealed class StringToImageSourceConverter : IValueConverter
 {
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => LoadImage(value as string);
+
+    public static ImageSource? LoadImage(string? path)
     {
-        if (value is not string path || string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        if (string.IsNullOrWhiteSpace(path))
         {
             return null;
         }
 
-        var image = new BitmapImage();
-        image.BeginInit();
-        image.CacheOption = BitmapCacheOption.OnLoad;
-        image.UriSource = new Uri(path, UriKind.Absolute);
-        image.EndInit();
-        image.Freeze();
-        return image;
+        try
+        {
+            using var stream = File.OpenRead(path);
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.DecodePixelWidth = 320;
+            image.StreamSource = stream;
+            image.EndInit();
+            image.Freeze();
+            return image;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+            or ArgumentException or NotSupportedException or FormatException
+            or InvalidOperationException or System.Security.SecurityException)
+        {
+            return null;
+        }
     }
 
     public object ConvertBack(object value, Type targetType, object? parameter, CultureInfo culture) =>

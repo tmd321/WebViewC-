@@ -8,39 +8,60 @@ namespace LineMonitor.App.ViewModels;
 /// <summary>Backs the "실시간 불량정보" screen: recent defect thumbnails + 개소×불량유형 pivot table.</summary>
 public sealed partial class DefectHistoryViewModel : ObservableObject
 {
-    private const int InitialLoadTake = 30;
+    private const int InitialLoadTake = 10;
     private const int MaxRecentDefects = 200;
 
-    private LineId? _currentLineId;
+    private ILineAdapter? _currentAdapter;
     private long _lastSeenId;
 
-    public ObservableCollection<DefectRecord> RecentDefects { get; } = new();
+    public ObservableCollection<DefectThumbnailViewModel> RecentDefects { get; } = new();
     public ObservableCollection<DefectPivotRow> PivotRows { get; } = new();
 
     [ObservableProperty] private ObservableCollection<string> _defectTypeColumns = new();
+    [ObservableProperty] private string _currentLotId = "-";
+    [ObservableProperty] private int _totalDefectCount;
+
+    public void Reset()
+    {
+        _currentAdapter = null;
+        _lastSeenId = 0;
+        CurrentLotId = "-";
+        TotalDefectCount = 0;
+        RecentDefects.Clear();
+        PivotRows.Clear();
+        DefectTypeColumns = new ObservableCollection<string>();
+    }
 
     public async Task RefreshAsync(ILineAdapter adapter, CancellationToken ct = default)
     {
-        // 라인 바뀌면 워터마크/목록 리셋 — 이전 라인 sinceId로 새 라인 조회하면 안 됨.
-        if (_currentLineId != adapter.LineId)
+        // 같은 공정에서도 극성/접속 DB가 달라지면 이전 ID를 재사용하지 않는다.
+        if (!ReferenceEquals(_currentAdapter, adapter))
         {
-            _currentLineId = adapter.LineId;
-            _lastSeenId = 0;
-            RecentDefects.Clear();
+            Reset();
+            _currentAdapter = adapter;
         }
 
         var defects = await adapter.GetRecentDefectsAsync(
             _lastSeenId == 0 ? InitialLoadTake : MaxRecentDefects, _lastSeenId, ct);
+        if (!ReferenceEquals(_currentAdapter, adapter)) return;
 
         if (defects.Count > 0)
         {
+            var lotId = defects.MaxBy(defect => defect.Id)!.LotId;
+            if (CurrentLotId != lotId)
+            {
+                CurrentLotId = lotId;
+                RecentDefects.Clear();
+                _lastSeenId = 0;
+            }
+
             if (_lastSeenId == 0)
             {
                 // 초기 로드: 어댑터가 이미 최신순(내림차순)으로 줌 — 그대로 채움.
                 RecentDefects.Clear();
-                foreach (var d in defects)
+                foreach (var d in defects.OrderByDescending(defect => defect.Id))
                 {
-                    RecentDefects.Add(d);
+                    RecentDefects.Add(new DefectThumbnailViewModel(d));
                 }
             }
             else
@@ -48,7 +69,7 @@ public sealed partial class DefectHistoryViewModel : ObservableObject
                 // 증분: 어댑터가 오름차순으로 줌 — 맨 앞에 순서대로 꽂으면 최신이 맨 위로 옴.
                 foreach (var d in defects)
                 {
-                    RecentDefects.Insert(0, d);
+                    RecentDefects.Insert(0, new DefectThumbnailViewModel(d));
                 }
 
                 while (RecentDefects.Count > MaxRecentDefects)
@@ -61,6 +82,15 @@ public sealed partial class DefectHistoryViewModel : ObservableObject
         }
 
         var pivot = await adapter.GetDefectPivotAsync(ct);
+        if (!ReferenceEquals(_currentAdapter, adapter)) return;
+        var pivotLotId = pivot.FirstOrDefault()?.LotId;
+        if (pivotLotId is not null and not "-" && pivotLotId != CurrentLotId)
+        {
+            CurrentLotId = pivotLotId;
+            RecentDefects.Clear();
+            _lastSeenId = 0;
+        }
+        TotalDefectCount = pivot.Sum(row => row.Total);
         PivotRows.Clear();
         foreach (var row in pivot)
         {
@@ -72,6 +102,9 @@ public sealed partial class DefectHistoryViewModel : ObservableObject
             .Distinct()
             .OrderBy(x => x, StringComparer.CurrentCulture)
             .ToList();
-        DefectTypeColumns = new ObservableCollection<string>(columns);
+        if (!DefectTypeColumns.SequenceEqual(columns))
+        {
+            DefectTypeColumns = new ObservableCollection<string>(columns);
+        }
     }
 }

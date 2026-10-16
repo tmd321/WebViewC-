@@ -103,11 +103,12 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="90" />
                 </Grid.ColumnDefinitions>
 
-            <ItemsControl Grid.Row="0" Grid.Column="0" ItemsSource="{Binding Edges}">
+            <ItemsControl Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Edges}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                         <controls:LaneBoundaryPanel />
@@ -130,7 +131,13 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-                <ItemsControl Grid.Row="1" Grid.Column="0" ItemsSource="{Binding Lanes}" Style="{StaticResource LaneMeasurementStrip}">
+                <StackPanel Grid.Row="1" Grid.Column="0" VerticalAlignment="Bottom" Margin="0,0,6,5"
+                            Visibility="{Binding ShowInsulation, ElementName=Root, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="절연 Wet" FontSize="11" Foreground="Black" HorizontalAlignment="Right" />
+                    <TextBlock Text="절연 Dry" FontSize="11" Foreground="Black" HorizontalAlignment="Right" />
+                </StackPanel>
+
+                <ItemsControl Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Lanes}" Style="{StaticResource LaneMeasurementStrip}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <UniformGrid Rows="1" />
@@ -160,7 +167,7 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <StackPanel Grid.Row="1" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <StackPanel Grid.Row="1" Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <TextBlock Text="Avr." Style="{StaticResource MutedText}" FontSize="14" Foreground="Black" FontWeight="Bold" HorizontalAlignment="Center" />
                     <TextBlock Text="{Binding AvrWet, StringFormat='{}{0:0.00} (wet)'}" FontSize="15" Foreground="Black" FontWeight="Bold" HorizontalAlignment="Center" />
                     <TextBlock Text="{Binding AvrDry, StringFormat='{}{0:0.00} (dry)'}" FontSize="15" Foreground="Black" FontWeight="Bold" HorizontalAlignment="Center" />

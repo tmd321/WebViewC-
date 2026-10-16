@@ -62,9 +62,17 @@ public partial class DefectPivotTable : UserControl
             PivotGrid.Columns.Add(new DataGridTextColumn
             {
                 Header = type,
-                Width = 90,
-                Binding = new Binding($"CountsByDefectType[{type}]") { TargetNullValue = "-" }
+                Width = 140,
+                Binding = new Binding($"CountsByDefectType[{type}]") { TargetNullValue = 0, FallbackValue = 0 }
             });
         }
+
+        PivotGrid.Columns.Add(new DataGridTextColumn
+        {
+            Header = "합계",
+            Width = 90,
+            Binding = new Binding(nameof(LineMonitor.Core.Models.DefectPivotRow.Total)) { StringFormat = "N0" }
+        });
+
     }
 }

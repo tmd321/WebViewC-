@@ -1,6 +1,11 @@
 <UserControl x:Class="LineMonitor.App.Controls.DefectPivotTable"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <DockPanel>
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="8,8,8,0">
+            <TextBlock Text="{Binding CurrentLotId, StringFormat='불량 LOT: {0}'}" Style="{StaticResource SectionHeaderText}" />
+            <TextBlock Text="{Binding TotalDefectCount, StringFormat='총 {0:N0}건'}" FontWeight="Bold" Margin="16,0,0,0" />
+        </StackPanel>
     <DataGrid x:Name="PivotGrid" ItemsSource="{Binding PivotRows}"
               AutoGenerateColumns="False" IsReadOnly="True"
               HeadersVisibility="Column" GridLinesVisibility="Horizontal"
@@ -8,7 +13,8 @@
               HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
               CanUserAddRows="False" Margin="8">
         <DataGrid.Columns>
-            <DataGridTextColumn Header="개소" Binding="{Binding Location}" Width="180" />
+            <DataGridTextColumn Header="개소" Binding="{Binding Location}" Width="200" />
         </DataGrid.Columns>
     </DataGrid>
+    </DockPanel>
 </UserControl>

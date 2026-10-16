@@ -19,7 +19,7 @@ namespace LineMonitor.App;
 /// small hand-rolled replacement styled with our own resources).
 /// Boxes live on a Canvas at their own X/Y — resizing the window never reflows them
 /// (a WrapPanel did that at first and it was explicitly unwanted). Dragging a title bar
-/// moves that one card freely; there's no swap-on-drop, no auto layout at all.
+/// moves that one card up to other cards' boundaries; there's no swap-on-drop or auto layout.
 /// The canvas starts empty — the left sidebar lists every box type as a catalog the user
 /// drags (or double-clicks) onto the canvas; already-placed ones show dimmed and can't be
 /// re-added, closing (✕) a card un-dims its row so it can be added back. Position/size/
@@ -174,7 +174,7 @@ public partial class MainWindow : Window
             VerticalAlignment = VerticalAlignment.Center,
             ToolTip = "가로 기본 크기로"
         };
-        fitWidthButton.Click += (_, _) => card.Width = DefaultCardWidth;
+        fitWidthButton.Click += (_, _) => ResizeBox(model, DefaultCardWidth, card.Height);
 
         var fitHeightButton = new Button
         {
@@ -186,7 +186,7 @@ public partial class MainWindow : Window
             VerticalAlignment = VerticalAlignment.Center,
             ToolTip = "세로 기본 크기로"
         };
-        fitHeightButton.Click += (_, _) => card.Height = DefaultCardHeight;
+        fitHeightButton.Click += (_, _) => ResizeBox(model, card.Width, DefaultCardHeight);
 
         var closeButton = new Button
         {
@@ -222,7 +222,7 @@ public partial class MainWindow : Window
             Child = titleGrid
         };
 
-        // 제목바 드래그 = 이 카드 하나를 캔버스 위에서 자유롭게 이동(스왑 아님, 다른 박스한테 영향 없음).
+        // 제목바 드래그 = 다른 박스 경계까지 이동(스왑 아님, 다른 박스의 위치는 유지).
         // Ctrl+클릭이면 이동 대신 다중 선택 토글(MFC 다이얼로그 에디터처럼) — "크기 맞춤" 버튼들이 이 선택을 씀.
         Point? moveStart = null;
         double moveStartX = 0, moveStartY = 0;
@@ -254,8 +254,8 @@ public partial class MainWindow : Window
             }
 
             var pos = e.GetPosition(null);
-            model.X = Math.Max(0, moveStartX + (pos.X - start.X));
-            model.Y = Math.Max(0, moveStartY + (pos.Y - start.Y));
+            MoveBox(model, Math.Max(0, moveStartX + (pos.X - start.X)),
+                Math.Max(0, moveStartY + (pos.Y - start.Y)));
         };
         titleBar.MouseLeftButtonUp += (_, _) =>
         {
@@ -317,8 +317,8 @@ public partial class MainWindow : Window
             }
 
             var pos = e.GetPosition(null);
-            card.Width = Math.Max(MinCardWidth, resizeStartWidth + (pos.X - start.X));
-            card.Height = Math.Max(MinCardHeight, resizeStartHeight + (pos.Y - start.Y));
+            ResizeBox(model, Math.Max(MinCardWidth, resizeStartWidth + (pos.X - start.X)),
+                Math.Max(MinCardHeight, resizeStartHeight + (pos.Y - start.Y)));
         };
         grip.MouseLeftButtonUp += (_, _) =>
         {
@@ -347,6 +347,62 @@ public partial class MainWindow : Window
         card.PreviewMouseLeftButtonDown += (_, _) => BringToFront(model);
 
         return card;
+    }
+
+    private IEnumerable<Rect> OtherBoxBounds(DashboardBoxModel model) =>
+        _visibleBoxes.Where(other => other != model && other.Card is FrameworkElement)
+            .Select(other => new Rect(other.X, other.Y,
+                ((FrameworkElement)other.Card).Width, ((FrameworkElement)other.Card).Height));
+
+    private static bool Overlaps(double start, double length, double otherStart, double otherLength) =>
+        start < otherStart + otherLength && start + length > otherStart;
+
+    private static double ClampMovement(double current, double target, double length, double otherStart, double otherLength)
+    {
+        // 이동 경로의 경계도 검사해 빠르게 드래그해도 다른 박스를 통과하지 않게 한다.
+        if (current + length <= otherStart && target > current)
+            return Math.Min(target, otherStart - length);
+        if (current >= otherStart + otherLength && target < current)
+            return Math.Max(target, otherStart + otherLength);
+        return target;
+    }
+
+    private void MoveBox(DashboardBoxModel model, double x, double y)
+    {
+        if (model.Card is not FrameworkElement card) return;
+        var obstacles = OtherBoxBounds(model).ToList();
+        foreach (var bounds in obstacles)
+        {
+            if (Overlaps(model.Y, card.Height, bounds.Top, bounds.Height))
+                x = ClampMovement(model.X, x, card.Width, bounds.Left, bounds.Width);
+        }
+        model.X = x;
+        foreach (var bounds in obstacles)
+        {
+            if (Overlaps(model.X, card.Width, bounds.Left, bounds.Width))
+                y = ClampMovement(model.Y, y, card.Height, bounds.Top, bounds.Height);
+        }
+        model.Y = y;
+    }
+
+    private void ResizeBox(DashboardBoxModel model, double width, double height)
+    {
+        if (model.Card is not FrameworkElement card) return;
+        var obstacles = OtherBoxBounds(model).ToList();
+        foreach (var bounds in obstacles)
+        {
+            if (width > card.Width && Overlaps(model.Y, card.Height, bounds.Top, bounds.Height))
+                width = ClampMovement(model.X + card.Width, model.X + width, 0,
+                    bounds.Left, bounds.Width) - model.X;
+        }
+        card.Width = width;
+        foreach (var bounds in obstacles)
+        {
+            if (height > card.Height && Overlaps(model.X, card.Width, bounds.Left, bounds.Width))
+                height = ClampMovement(model.Y + card.Height, model.Y + height, 0,
+                    bounds.Top, bounds.Height) - model.Y;
+        }
+        card.Height = height;
     }
 
     private void BringToFront(DashboardBoxModel model) => model.ZIndex = _nextZIndex++;
@@ -453,15 +509,8 @@ public partial class MainWindow : Window
                 continue;
             }
 
-            if (matchWidth)
-            {
-                fe.Width = anchorFe.ActualWidth;
-            }
-
-            if (matchHeight)
-            {
-                fe.Height = anchorFe.ActualHeight;
-            }
+            ResizeBox(model, matchWidth ? anchorFe.ActualWidth : fe.Width,
+                matchHeight ? anchorFe.ActualHeight : fe.Height);
         }
     }
 

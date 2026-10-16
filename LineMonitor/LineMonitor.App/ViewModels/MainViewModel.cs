@@ -72,6 +72,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         TrendCpk.TrendGroups.Clear();
         TrendCpk.CpkRows.Clear();
         _adapter = _factory.Create(lineId, electrodeType);
+        DefectHistory.Reset();
         OnPropertyChanged(nameof(SelectionDisplayName));
         _ = TickAsync();
     }

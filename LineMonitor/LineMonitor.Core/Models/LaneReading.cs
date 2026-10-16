@@ -40,13 +40,26 @@ public sealed record DefectRecord(
     decimal? PosX,
     decimal? PosY,
     decimal? SizeX,
-    decimal? SizeY);
+    decimal? SizeY)
+{
+    public int? PcIndex { get; init; }
+    public string Location { get; init; } = "-";
+    public string DefectTypeName { get; init; } = "";
+    public decimal? PosFullX { get; init; }
+    public decimal? PosFullY { get; init; }
+    public decimal? DisplayPosX => PosFullX ?? PosX;
+    public decimal? DisplayPosY => PosFullY ?? PosY;
+}
 
 public sealed record CpkResult(int Lane, CpkCategory Category, double? Value);
 
 public sealed record DefectCodeInfo(int Code, string Name, string NameKo);
 
-public sealed record DefectPivotRow(string Location, IReadOnlyDictionary<string, int> CountsByDefectType);
+public sealed record DefectPivotRow(string Location, IReadOnlyDictionary<string, int> CountsByDefectType)
+{
+    public string LotId { get; init; } = "-";
+    public int Total => CountsByDefectType.Values.Sum();
+}
 
 // --- "Total Server" 레퍼런스 화면(실시간 조회) 전용 모델 ---
 // 화면은 레인 셀(폭 방향 N개) 사이사이의 "간격/에지" 값(N+1개, tolerance/cutting 지점)과
