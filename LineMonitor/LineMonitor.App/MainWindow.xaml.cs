@@ -149,7 +149,7 @@ public partial class MainWindow : Window
         var anchorBadge = new TextBlock
         {
             Text = "기준",
-            FontSize = 12,
+            FontSize = 14,
             FontWeight = FontWeights.Bold,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(6, 0, 0, 0),
@@ -170,7 +170,7 @@ public partial class MainWindow : Window
             Width = 22,
             Height = 22,
             Padding = new Thickness(0),
-            FontSize = 13,
+            FontSize = 15,
             VerticalAlignment = VerticalAlignment.Center,
             ToolTip = "가로 기본 크기로"
         };
@@ -182,7 +182,7 @@ public partial class MainWindow : Window
             Width = 22,
             Height = 22,
             Padding = new Thickness(0),
-            FontSize = 13,
+            FontSize = 15,
             VerticalAlignment = VerticalAlignment.Center,
             ToolTip = "세로 기본 크기로"
         };
@@ -194,7 +194,7 @@ public partial class MainWindow : Window
             Width = 22,
             Height = 22,
             Padding = new Thickness(0),
-            FontSize = 13,
+            FontSize = 15,
             VerticalAlignment = VerticalAlignment.Center,
             ToolTip = "닫기 (사이드바에서 다시 추가 가능)"
         };

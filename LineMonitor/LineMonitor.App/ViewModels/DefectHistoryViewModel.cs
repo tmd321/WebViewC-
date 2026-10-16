@@ -20,6 +20,7 @@ public sealed partial class DefectHistoryViewModel : ObservableObject
     [ObservableProperty] private ObservableCollection<string> _defectTypeColumns = new();
     [ObservableProperty] private string _currentLotId = "-";
     [ObservableProperty] private int _totalDefectCount;
+    [ObservableProperty] private string _topDefectsSummary = "-";
 
     public void Reset()
     {
@@ -27,6 +28,7 @@ public sealed partial class DefectHistoryViewModel : ObservableObject
         _lastSeenId = 0;
         CurrentLotId = "-";
         TotalDefectCount = 0;
+        TopDefectsSummary = "-";
         RecentDefects.Clear();
         PivotRows.Clear();
         DefectTypeColumns = new ObservableCollection<string>();
@@ -91,6 +93,17 @@ public sealed partial class DefectHistoryViewModel : ObservableObject
             _lastSeenId = 0;
         }
         TotalDefectCount = pivot.Sum(row => row.Total);
+        var topDefects = pivot
+            .SelectMany(row => row.CountsByDefectType)
+            .GroupBy(pair => pair.Key)
+            .Select(group => new { Name = group.Key, Count = group.Sum(pair => pair.Value) })
+            .Where(defect => defect.Count > 0)
+            .OrderByDescending(defect => defect.Count)
+            .ThenBy(defect => defect.Name, StringComparer.CurrentCulture)
+            .Take(3)
+            .Select(defect => $"{defect.Name}({defect.Count:N0})")
+            .ToList();
+        TopDefectsSummary = topDefects.Count > 0 ? string.Join(", ", topDefects) : "-";
         PivotRows.Clear();
         foreach (var row in pivot)
         {

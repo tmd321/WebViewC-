@@ -35,6 +35,8 @@ public sealed class MockLineAdapter : ILineAdapter
     public LineId LineId => Profile.LineId;
     public LineProfile Profile { get; }
 
+    public Task<bool> CheckConnectionAsync(CancellationToken ct = default) => Task.FromResult(false);
+
     public Task<FrameSnapshot?> GetLatestFrameAsync(Side side, CancellationToken ct = default)
     {
         var lanes = Enumerable.Range(1, Profile.LaneCount)

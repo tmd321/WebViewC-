@@ -12,7 +12,7 @@
         <!-- 메인창과 같은 톤의 타이틀바. 리사이즈 안 되는 창이라 닫기만 -->
         <Border DockPanel.Dock="Top" Background="#2B2F36" Height="32" MouseLeftButtonDown="OnTitleBarMouseLeftButtonDown">
             <Grid>
-                <TextBlock Text="라인 선택" Foreground="White" FontSize="14" FontWeight="SemiBold"
+                <TextBlock Text="라인 선택" Foreground="White" FontSize="16" FontWeight="SemiBold"
                            VerticalAlignment="Center" HorizontalAlignment="Left" Margin="12,0,0,0" />
                 <Button Style="{StaticResource TitleBarCloseButton}" Click="OnCloseClick"
                         HorizontalAlignment="Right" Height="32" ToolTip="닫기">
@@ -27,7 +27,7 @@
         <ScrollViewer VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="24">
                 <Image Source="/Assets/logo.png" Height="36" HorizontalAlignment="Center" Margin="0,0,0,16" />
-                <TextBlock Text="사이트, 공정 및 극성을 선택하세요" FontSize="17" FontWeight="SemiBold"
+                <TextBlock Text="사이트, 공정 및 극성을 선택하세요" FontSize="19" FontWeight="SemiBold"
                            HorizontalAlignment="Center" Margin="0,0,0,20" />
 
                 <!-- 사이트 > 공정 > 극성 순서로 선택 -->

@@ -19,7 +19,7 @@
         <Style x:Key="LayoutPresetTab" TargetType="RadioButton">
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontSize" Value="16" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Padding" Value="18,6" />
             <Setter Property="Margin" Value="0,0,6,0" />
@@ -50,7 +50,7 @@
         <!-- 커스텀 타이틀바: 어두운 회색 바탕 + 흰 글씨, 창 기본 크롬 대신 직접 그림 -->
         <Border DockPanel.Dock="Top" Background="#2B2F36" Height="36" MouseLeftButtonDown="OnTitleBarMouseLeftButtonDown">
             <Grid>
-                <TextBlock Text="라인 실시간 모니터링" Foreground="White" FontSize="15" FontWeight="SemiBold"
+                <TextBlock Text="라인 실시간 모니터링" Foreground="White" FontSize="17" FontWeight="SemiBold"
                            VerticalAlignment="Center" HorizontalAlignment="Left" Margin="14,0,0,0" />
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Style="{StaticResource TitleBarButton}" Click="OnMinimizeClick" ToolTip="최소화">
@@ -70,22 +70,22 @@
         </Border>
 
         <!-- 상단 바: 라인 선택, Live 상태, UI 프리셋 -->
-        <Border DockPanel.Dock="Top" Background="{StaticResource BgBrush}" Padding="12,8" Height="48">
+        <Border DockPanel.Dock="Top" Background="{StaticResource BgBrush}" Padding="12,8" MinHeight="48">
             <!-- 단일 셀 Grid: 자식들이 Margin+HorizontalAlignment=Left로 각자 독립 배치됨 -->
             <!-- VS 디자이너에서 이 안의 요소를 마우스로 드래그하면 Margin이 자동으로 갱신됨(MFC 다이얼로그 에디터처럼) -->
             <Grid>
-                <TextBlock Text="{Binding SelectionDisplayName}" FontSize="16" FontWeight="SemiBold"
+                <TextBlock Text="{Binding SelectionDisplayName}" FontSize="18" FontWeight="SemiBold"
                            VerticalAlignment="Center" HorizontalAlignment="Left" Margin="0"
                            Cursor="Hand" ToolTip="더블클릭해서 라인 변경"
                            MouseLeftButtonDown="OnLineNameMouseLeftButtonDown" />
 
-                <Button Content="Live 토글" Command="{Binding ToggleLiveCommand}" Style="{StaticResource PillButton}"
-                        VerticalAlignment="Center" HorizontalAlignment="Left" Margin="140,0,0,0" />
-
-                <Ellipse Width="10" Height="10" VerticalAlignment="Center" HorizontalAlignment="Left"
-                         Margin="230,0,0,0" Fill="{Binding IsLive, Converter={StaticResource LiveBrush2}}" />
-                <TextBlock Text="Live" VerticalAlignment="Center" HorizontalAlignment="Left"
-                           Margin="246,0,0,0" Style="{StaticResource MutedText}" />
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left"
+                            Margin="140,0,0,0">
+                    <Button Content="Live 토글" Command="{Binding ToggleLiveCommand}" Style="{StaticResource PillButton}" />
+                    <Ellipse Width="10" Height="10" VerticalAlignment="Center" Margin="14,0,6,0"
+                             Fill="{Binding IsLive, Converter={StaticResource LiveBrush2}}" />
+                    <TextBlock Text="Live" VerticalAlignment="Center" Style="{StaticResource MutedText}" />
+                </StackPanel>
 
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left"
                             Margin="300,0,0,0" ToolTip="배치는 프리셋 전환·라인 변경·종료 시 자동 저장됩니다.">
@@ -109,6 +109,55 @@
                 </StackPanel>
 
                 <Image Source="/Assets/logo.png" Height="28" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0" />
+            </Grid>
+        </Border>
+
+        <Border DockPanel.Dock="Top" Background="{StaticResource BgBrush}" Padding="8,0,8,4">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="200" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="200" />
+                </Grid.ColumnDefinitions>
+            <WrapPanel Grid.Column="1" HorizontalAlignment="Center">
+                <Border Style="{StaticResource CardBorder}" MinWidth="200">
+                    <TextBlock Text="{Binding LiveOverview.LotId, Mode=OneWay, StringFormat='LOT ID : {0}'}"
+                               Style="{StaticResource ValueText}" />
+                </Border>
+                <Border Style="{StaticResource CardBorder}" MinWidth="160">
+                    <TextBlock Text="{Binding LiveOverview.Meter, Mode=OneWay, StringFormat='Meter : {0}'}"
+                               Style="{StaticResource ValueText}" />
+                </Border>
+                <Border Style="{StaticResource CardBorder}">
+                    <TextBlock Text="OS 라벨 부착 수량 : -" Style="{StaticResource ValueText}" />
+                </Border>
+                <Border Style="{StaticResource CardBorder}">
+                    <TextBlock Text="DS 라벨 부착 수량 : -" Style="{StaticResource ValueText}" />
+                </Border>
+                <Border Style="{StaticResource CardBorder}" MinWidth="220">
+                    <TextBlock Text="{Binding DefectHistory.TopDefectsSummary, Mode=OneWay, StringFormat='표면 불량 top 3 : {0}'}"
+                               Style="{StaticResource ValueText}" TextWrapping="Wrap" />
+                </Border>
+            </WrapPanel>
+                <Border Grid.Column="2" Margin="8,4,4,4" Padding="12,8" CornerRadius="4"
+                        VerticalAlignment="Center"
+                        ToolTip="DB 서버 응답 상태입니다. 설비·PLC의 운전 상태와는 다릅니다.">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background" Value="#D9DDE3" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsDatabaseConnected}" Value="True">
+                                    <Setter Property="Background" Value="#00E600" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsDatabaseConnected}" Value="False">
+                                    <Setter Property="Background" Value="#FF4D4F" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="{Binding DatabaseStatusText}" Foreground="Black" FontSize="16"
+                               FontWeight="Bold" HorizontalAlignment="Center" />
+                </Border>
             </Grid>
         </Border>
 
@@ -138,7 +187,7 @@
             <Border Grid.Column="1" x:Name="SidebarContent" Background="{StaticResource SidebarBgBrush}">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Margin="14,16,14,10">
-                        <TextBlock Text="박스 목록" FontSize="15" FontWeight="SemiBold" />
+                        <TextBlock Text="박스 목록" FontSize="17" FontWeight="SemiBold" />
                         <TextBlock Text="작업 영역으로 드래그하거나 더블클릭해서 추가" Style="{StaticResource MutedText}" Margin="0,2,0,0" />
                     </StackPanel>
                     <ListBox x:Name="CatalogList" Margin="4,0,4,4" BorderThickness="0" Background="Transparent"
@@ -152,7 +201,7 @@
                                             PreviewMouseMove="OnCatalogRowPreviewMouseMove">
                                     <Ellipse Width="6" Height="6" Fill="{StaticResource AccentBrush}"
                                              VerticalAlignment="Center" Margin="0,0,8,0" />
-                                    <TextBlock Text="{Binding Title}" FontSize="14" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Title}" FontSize="16" TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
                                 <DataTemplate.Triggers>
                                     <DataTrigger Binding="{Binding IsPlaced}" Value="True">
@@ -196,7 +245,7 @@
 
                 <!-- 빈 작업 영역 안내 문구 — 박스가 하나라도 놓이면 코드비하인드에서 Collapsed 처리 -->
                 <TextBlock x:Name="EmptyCanvasHint" Text="여기에 박스를 드래그하세요"
-                           FontSize="18" Style="{StaticResource MutedText}"
+                           FontSize="20" Style="{StaticResource MutedText}"
                            HorizontalAlignment="Center" VerticalAlignment="Center"
                            IsHitTestVisible="False" />
             </Grid>

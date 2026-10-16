@@ -28,6 +28,15 @@ public sealed class Dong4CoaterPostgresAdapter : ILineAdapter
     public LineId LineId => LineId.Dong4Coater;
     public LineProfile Profile => LineProfile.All[LineId.Dong4Coater];
 
+    public async Task<bool> CheckConnectionAsync(CancellationToken ct = default)
+    {
+        await using var conn = new NpgsqlConnection(_connectionString);
+        await conn.OpenAsync(ct);
+        await using var cmd = new NpgsqlCommand("SELECT 1", conn);
+        await cmd.ExecuteScalarAsync(ct);
+        return true;
+    }
+
     public async Task<FrameSnapshot?> GetLatestFrameAsync(Side side, CancellationToken ct = default)
     {
         var insulColumns = _hasInsulation
