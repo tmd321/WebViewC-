@@ -16,6 +16,34 @@
 
     <Window.Resources>
         <conv:BoolToLiveBrushConverter x:Key="LiveBrush2" />
+        <Style x:Key="LayoutPresetTab" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="18,6" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="5"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource SidebarHoverBrush}" />
+                </Trigger>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+                    <Setter Property="Foreground" Value="White" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
 
     <DockPanel>
@@ -41,7 +69,7 @@
             </Grid>
         </Border>
 
-        <!-- 상단 바: 라인 선택은 사이드바로 옮김 — 여기는 Live 상태 + 힌트만 -->
+        <!-- 상단 바: 라인 선택, Live 상태, UI 프리셋 -->
         <Border DockPanel.Dock="Top" Background="{StaticResource BgBrush}" Padding="12,8" Height="48">
             <!-- 단일 셀 Grid: 자식들이 Margin+HorizontalAlignment=Left로 각자 독립 배치됨 -->
             <!-- VS 디자이너에서 이 안의 요소를 마우스로 드래그하면 Margin이 자동으로 갱신됨(MFC 다이얼로그 에디터처럼) -->
@@ -59,9 +87,15 @@
                 <TextBlock Text="Live" VerticalAlignment="Center" HorizontalAlignment="Left"
                            Margin="246,0,0,0" Style="{StaticResource MutedText}" />
 
-                <TextBlock Text="박스 제목바를 드래그해서 다른 박스와 자리를 바꾸거나, ✕로 닫으면 왼쪽 사이드바로 들어감(더블클릭하면 복귀)"
-                           VerticalAlignment="Center" HorizontalAlignment="Left" Margin="300,0,0,0"
-                           Style="{StaticResource MutedText}" />
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left"
+                            Margin="300,0,0,0" ToolTip="배치는 프리셋 전환·라인 변경·종료 시 자동 저장됩니다.">
+                    <RadioButton x:Name="LayoutPreset1Button" Content="UI 프리셋1" Tag="1"
+                                 GroupName="LayoutPreset" IsChecked="True" Style="{StaticResource LayoutPresetTab}"
+                                 Click="OnLayoutPresetClick" />
+                    <RadioButton x:Name="LayoutPreset2Button" Content="UI 프리셋2" Tag="2"
+                                 GroupName="LayoutPreset" Style="{StaticResource LayoutPresetTab}"
+                                 Click="OnLayoutPresetClick" />
+                </StackPanel>
 
                 <!-- Ctrl+클릭으로 박스 여러 개 고른 뒤 마지막으로 고른 박스 크기에 맞춤(MFC "동일하게" 기능) -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,90,0">
@@ -83,7 +117,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="40" />
                 <ColumnDefinition x:Name="SidebarContentColumn" Width="228" MinWidth="160" MaxWidth="520" />
-                <ColumnDefinition Width="6" />
+                <ColumnDefinition x:Name="SidebarSplitterColumn" Width="6" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
@@ -132,7 +166,7 @@
             </Border>
 
             <!-- 사이드바 폭 조절용 굵은 스플리터 — 평소엔 진한 회색 선, hover하면 액센트색 -->
-            <GridSplitter Grid.Column="2" Width="6" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+            <GridSplitter x:Name="SidebarWidthSplitter" Grid.Column="2" Width="6" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                           Background="{StaticResource BorderBrush2}" Style="{StaticResource SidebarSplitter}" />
 
             <!-- 작업 영역: Canvas 기반 자유배치 — 창 크기 바뀌어도 재정렬 안 되고 박스가 각자 X/Y 좌표를 유지함 -->

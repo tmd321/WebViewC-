@@ -213,11 +213,7 @@
 
             <Style x:Key="PanelBorder" TargetType="Border">
                 <Setter Property="Background" Value="{StaticResource PanelBrush}" />
-                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush2}" />
-                <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="CornerRadius" Value="6" />
                 <Setter Property="Padding" Value="12" />
-                <Setter Property="Margin" Value="0,0,0,8" />
             </Style>
         </ResourceDictionary>
     </Application.Resources>

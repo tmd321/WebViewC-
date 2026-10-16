@@ -23,7 +23,7 @@ namespace LineMonitor.App;
 /// The canvas starts empty — the left sidebar lists every box type as a catalog the user
 /// drags (or double-clicks) onto the canvas; already-placed ones show dimmed and can't be
 /// re-added, closing (✕) a card un-dims its row so it can be added back. Position/size/
-/// visibility persists per site/process/electrode selection under %LocalAppData%\LineMonitor.
+/// visibility persists per site/process/electrode/preset selection under %LocalAppData%\LineMonitor.
 /// </summary>
 public partial class MainWindow : Window
 {
@@ -40,6 +40,8 @@ public partial class MainWindow : Window
     private readonly List<DashboardBoxModel> _allBoxes = new();
 
     private bool _sidebarExpanded = true;
+    private double _sidebarExpandedWidth = 228;
+    private int _selectedLayoutPreset = 1;
     private Point? _catalogDragStart;
     private DashboardBoxModel? _catalogDragCandidate;
 
@@ -541,7 +543,7 @@ public partial class MainWindow : Window
                 return;
             }
 
-            SaveLayout(vm);
+            if (!SaveLayout(vm)) return;
             vm.SelectLine(lineId, electrodeType);
             ResetLayout();
             RestoreSavedLayout(vm);
@@ -550,12 +552,48 @@ public partial class MainWindow : Window
 
     private void OnSidebarToggleClick(object sender, RoutedEventArgs e)
     {
+        if (_sidebarExpanded)
+        {
+            _sidebarExpandedWidth = SidebarContentColumn.ActualWidth;
+        }
+
         _sidebarExpanded = !_sidebarExpanded;
-        SidebarContentColumn.Width = _sidebarExpanded ? new GridLength(228) : new GridLength(0);
+        SidebarContentColumn.MinWidth = _sidebarExpanded ? 160 : 0;
+        SidebarContentColumn.Width = new GridLength(_sidebarExpanded ? _sidebarExpandedWidth : 0);
+        SidebarContent.Visibility = _sidebarExpanded ? Visibility.Visible : Visibility.Collapsed;
+        SidebarSplitterColumn.Width = new GridLength(_sidebarExpanded ? 6 : 0);
+        SidebarWidthSplitter.Visibility = _sidebarExpanded ? Visibility.Visible : Visibility.Collapsed;
+        SidebarToggleButton.ToolTip = _sidebarExpanded ? "박스 목록 접기" : "박스 목록 펼치기";
     }
 
-    private static string GetLayoutFilePath(MainViewModel viewModel) =>
-        Path.Combine(LayoutDirectory, $"{viewModel.SelectedLine.LineId}.{viewModel.SelectedElectrode}.layout.json");
+    private void OnLayoutPresetClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not RadioButton { Tag: string presetText } ||
+            !int.TryParse(presetText, out var preset) || preset is < 1 or > 2 ||
+            preset == _selectedLayoutPreset || DataContext is not MainViewModel viewModel)
+        {
+            return;
+        }
+
+        if (!SaveLayout(viewModel))
+        {
+            LayoutPreset1Button.IsChecked = _selectedLayoutPreset == 1;
+            LayoutPreset2Button.IsChecked = _selectedLayoutPreset == 2;
+            return;
+        }
+
+        _selectedLayoutPreset = preset;
+        ResetLayout();
+        RestoreSavedLayout(viewModel);
+    }
+
+    private string GetLayoutFilePath(MainViewModel viewModel)
+    {
+        // 기존 단일 배치 파일을 프리셋1로 그대로 사용한다.
+        var presetSuffix = _selectedLayoutPreset == 1 ? "" : ".Preset2";
+        return Path.Combine(LayoutDirectory,
+            $"{viewModel.SelectedLine.LineId}.{viewModel.SelectedElectrode}{presetSuffix}.layout.json");
+    }
 
     private void ResetLayout()
     {
@@ -645,11 +683,11 @@ public partial class MainWindow : Window
     {
         if (DataContext is MainViewModel viewModel)
         {
-            SaveLayout(viewModel);
+            e.Cancel = !SaveLayout(viewModel);
         }
     }
 
-    private void SaveLayout(MainViewModel viewModel)
+    private bool SaveLayout(MainViewModel viewModel)
     {
         try
         {
@@ -668,10 +706,13 @@ public partial class MainWindow : Window
                     .ToDictionary(b => b.Id, b => ((FrameworkElement)b.Card!).Height)
             };
             File.WriteAllText(layoutFilePath, JsonSerializer.Serialize(state));
+            return true;
         }
-        catch
+        catch (Exception exception)
         {
-            // 레이아웃 저장 실패해도 종료는 막지 않음.
+            MessageBox.Show(this, $"UI 배치를 저장하지 못했습니다.\n{exception.Message}",
+                "배치 저장 실패", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
         }
     }
 
