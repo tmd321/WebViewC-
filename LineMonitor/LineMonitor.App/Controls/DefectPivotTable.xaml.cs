@@ -52,7 +52,7 @@ public partial class DefectPivotTable : UserControl
             return;
         }
 
-        while (PivotGrid.Columns.Count > 1)
+        while (PivotGrid.Columns.Count > 5)
         {
             PivotGrid.Columns.RemoveAt(PivotGrid.Columns.Count - 1);
         }
@@ -63,16 +63,15 @@ public partial class DefectPivotTable : UserControl
             {
                 Header = type,
                 Width = 140,
-                Binding = new Binding($"CountsByDefectType[{type}]") { TargetNullValue = 0, FallbackValue = 0 }
+                ElementStyle = (Style)Resources["PivotCellText"],
+                Binding = new Binding($"CountsByDefectType[{type}]")
+                {
+                    Mode = BindingMode.OneWay,
+                    StringFormat = "{0:#,##0;-#,##0;-}",
+                    TargetNullValue = "-",
+                    FallbackValue = "-"
+                }
             });
         }
-
-        PivotGrid.Columns.Add(new DataGridTextColumn
-        {
-            Header = "합계",
-            Width = 90,
-            Binding = new Binding(nameof(LineMonitor.Core.Models.DefectPivotRow.Total)) { StringFormat = "N0" }
-        });
-
     }
 }

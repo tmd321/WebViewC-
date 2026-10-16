@@ -35,6 +35,15 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
     public LineId LineId => LineId.Dong9Coater;
     public LineProfile Profile => LineProfile.All[LineId.Dong9Coater];
 
+    public async Task<bool> CheckConnectionAsync(CancellationToken ct = default)
+    {
+        await using var conn = new NpgsqlConnection(_connectionString);
+        await conn.OpenAsync(ct);
+        await using var cmd = new NpgsqlCommand("SELECT 1", conn);
+        await cmd.ExecuteScalarAsync(ct);
+        return true;
+    }
+
     private static int FramePcIndexFor(Side side, Stage stage) => (side, stage) switch
     {
         (Side.Top, Stage.Wet) => 0,
@@ -436,9 +445,10 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
         var order = sinceId > 0 ? "asc" : "desc";
         var sql = $"""
             with latest_lot as (
-                select lot_id from public.ng
-                where lot_id is not null
-                order by id desc limit 1
+                select coalesce(
+                    (select lot_id from public.frame where nullif(trim(lot_id), '') is not null order by id desc limit 1),
+                    (select lot_id from public.ng where nullif(trim(lot_id), '') is not null order by id desc limit 1)
+                ) as lot_id
             )
             select n.id, n.defect_time, n.lot_id, n.lane, n.pc_index, n.defect_type_code,
                    coalesce(d.defect_type_name, '') as defect_type_name,
@@ -494,18 +504,24 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
     {
         const string sql = """
             with latest_lot as (
-                select lot_id from public.ng
-                where lot_id is not null
-                order by id desc limit 1
+                select coalesce(
+                    (select lot_id from public.frame where nullif(trim(lot_id), '') is not null order by id desc limit 1),
+                    (select lot_id from public.ng where nullif(trim(lot_id), '') is not null order by id desc limit 1)
+                ) as lot_id
             )
-            select n.lot_id, n.pc_index,
+            select l.lot_id, n.pc_index,
                    coalesce(nullif(to_jsonb(d)->>'defect_type_name_ko', ''), nullif(d.defect_type_name, ''),
                             '코드 ' || n.defect_type_code::text, '미분류') as defect_type_name,
-                   count(*) as cnt
-            from public.ng n
-            join latest_lot l on l.lot_id = n.lot_id
+                   count(n.id) as cnt
+            from latest_lot l
+            left join public.ng n on n.lot_id = l.lot_id
             left join public.defect_code d on d.defect_type_code = n.defect_type_code
-            group by 1, 2, 3
+            group by 1, 2, 3;
+
+            select coalesce(nullif(to_jsonb(d)->>'defect_type_name_ko', ''), nullif(d.defect_type_name, ''),
+                            '코드 ' || d.defect_type_code::text, '미분류')
+            from public.defect_code d
+            order by d.defect_type_code;
             """;
 
         await using var conn = new NpgsqlConnection(_connectionString);
@@ -518,11 +534,12 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
         var lotId = "-";
         while (await reader.ReadAsync(ct))
         {
-            lotId = reader.GetString(0);
+            lotId = reader.IsDBNull(0) ? "-" : reader.GetString(0);
+            var count = checked((int)reader.GetInt64(3));
+            if (count == 0) continue;
             var pcIndex = reader.IsDBNull(1) ? (int?)null : reader.GetInt32(1);
             var location = DefectLocationFor(pcIndex);
             var name = reader.GetString(2);
-            var count = checked((int)reader.GetInt64(3));
             if (!countsByLocation.TryGetValue(location, out var counts))
             {
                 counts = new Dictionary<string, int>();
@@ -532,6 +549,14 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
         }
 
         var types = countsByLocation.Values.SelectMany(counts => counts.Keys).Distinct().ToList();
+        if (await reader.NextResultAsync(ct))
+        {
+            while (await reader.ReadAsync(ct))
+            {
+                var name = reader.GetString(0);
+                if (!types.Contains(name)) types.Add(name);
+            }
+        }
         foreach (var counts in countsByLocation.Values)
         {
             foreach (var type in types) counts.TryAdd(type, 0);

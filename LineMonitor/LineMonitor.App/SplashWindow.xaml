@@ -13,14 +13,14 @@
         <DockPanel>
             <!-- 메인창과 같은 톤의 타이틀바 — 스플래시라 버튼은 없음 -->
             <Border DockPanel.Dock="Top" Background="#2B2F36" Height="28">
-                <TextBlock Text="라인 실시간 모니터링" Foreground="White" FontSize="13" FontWeight="SemiBold"
+                <TextBlock Text="라인 실시간 모니터링" Foreground="White" FontSize="15" FontWeight="SemiBold"
                            VerticalAlignment="Center" HorizontalAlignment="Left" Margin="12,0,0,0" />
             </Border>
 
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                 <Image Source="/Assets/logo.png" Width="260" Stretch="Uniform" />
                 <TextBlock Text="라인 실시간 모니터링" HorizontalAlignment="Center" Margin="0,18,0,0"
-                           FontSize="15" Style="{StaticResource MutedText}" />
+                           FontSize="17" Style="{StaticResource MutedText}" />
             </StackPanel>
         </DockPanel>
     </Border>

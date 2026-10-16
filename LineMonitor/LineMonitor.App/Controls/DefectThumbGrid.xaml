@@ -15,7 +15,7 @@
                             <Border Background="Black" Height="120" ToolTip="{Binding Record.ImagePath}">
                                 <Grid>
                                     <Image x:Name="DefectImage" Source="{Binding Image, IsAsync=True}" Stretch="Uniform" />
-                                    <TextBlock Text="이미지 없음 / 읽기 실패" Foreground="White" FontSize="12"
+                                    <TextBlock Text="이미지 없음 / 읽기 실패" Foreground="White" FontSize="14"
                                                HorizontalAlignment="Center" VerticalAlignment="Center">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">

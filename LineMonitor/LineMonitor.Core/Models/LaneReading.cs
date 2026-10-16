@@ -59,6 +59,17 @@ public sealed record DefectPivotRow(string Location, IReadOnlyDictionary<string,
 {
     public string LotId { get; init; } = "-";
     public int Total => CountsByDefectType.Values.Sum();
+    public string Top1 => GetTopDefect(0);
+    public string Top2 => GetTopDefect(1);
+    public string Top3 => GetTopDefect(2);
+
+    private string GetTopDefect(int index) => CountsByDefectType
+        .Where(pair => pair.Value > 0)
+        .OrderByDescending(pair => pair.Value)
+        .ThenBy(pair => pair.Key, StringComparer.CurrentCulture)
+        .Skip(index)
+        .Select(pair => pair.Key)
+        .FirstOrDefault() ?? "-";
 }
 
 // --- "Total Server" 레퍼런스 화면(실시간 조회) 전용 모델 ---

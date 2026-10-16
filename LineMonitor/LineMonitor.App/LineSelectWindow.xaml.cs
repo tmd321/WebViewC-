@@ -75,7 +75,7 @@ public partial class LineSelectWindow : Window
                         VerticalAlignment = VerticalAlignment.Center,
                         Margin = new Thickness(0, 0, 10, 0)
                     });
-                    electrodeContent.Children.Add(new TextBlock { Text = label, FontSize = 16 });
+                    electrodeContent.Children.Add(new TextBlock { Text = label, FontSize = 18 });
                     electrodeRow.Child = electrodeContent;
                     electrodeRow.MouseLeftButtonUp += (_, _) =>
                     {
@@ -89,13 +89,13 @@ public partial class LineSelectWindow : Window
                 var processArrow = new TextBlock
                 {
                     Text = "▸",
-                    FontSize = 12,
+                    FontSize = 14,
                     Margin = new Thickness(0, 0, 6, 0),
                     VerticalAlignment = VerticalAlignment.Center
                 };
                 var processContent = new StackPanel { Orientation = Orientation.Horizontal };
                 processContent.Children.Add(processArrow);
-                processContent.Children.Add(new TextBlock { Text = processLabel, FontSize = 16 });
+                processContent.Children.Add(new TextBlock { Text = processLabel, FontSize = 18 });
 
                 var processRow = new Border
                 {
@@ -116,8 +116,8 @@ public partial class LineSelectWindow : Window
             }
 
             // 접었다 폈다 되는 동 헤더 — 화살표 방향으로 상태 표시, 클릭하면 아래 공정 목록 토글.
-            var arrow = new TextBlock { Text = "▸", FontSize = 12, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center };
-            var headerText = new TextBlock { Text = group.Key, FontSize = 15, FontWeight = FontWeights.SemiBold };
+            var arrow = new TextBlock { Text = "▸", FontSize = 14, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center };
+            var headerText = new TextBlock { Text = group.Key, FontSize = 17, FontWeight = FontWeights.SemiBold };
             var headerContent = new StackPanel { Orientation = Orientation.Horizontal };
             headerContent.Children.Add(arrow);
             headerContent.Children.Add(headerText);

@@ -34,6 +34,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _isLive = true;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DatabaseStatusText))]
+    private bool? _isDatabaseConnected;
+
+    public string DatabaseStatusText => _adapter is MockLineAdapter ? "DB 미사용" : IsDatabaseConnected switch
+    {
+        true => "정상 동작 중",
+        false => "연결 실패",
+        null => "DB 연결 확인 중"
+    };
+
     public string SelectionDisplayName =>
         $"{SelectedLine.DisplayName} · {(SelectedElectrode == ElectrodeType.Positive ? "양극" : "음극")}";
 
@@ -72,6 +83,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         TrendCpk.TrendGroups.Clear();
         TrendCpk.CpkRows.Clear();
         _adapter = _factory.Create(lineId, electrodeType);
+        IsDatabaseConnected = null;
+        OnPropertyChanged(nameof(DatabaseStatusText));
         DefectHistory.Reset();
         OnPropertyChanged(nameof(SelectionDisplayName));
         _ = TickAsync();
@@ -79,7 +92,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private async Task TickAsync()
     {
-        if (!IsLive || _isRefreshing)
+        if (_isRefreshing)
         {
             return;
         }
@@ -88,6 +101,25 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         try
         {
             var adapter = _adapter;
+            if (adapter is not MockLineAdapter)
+            {
+                bool connected;
+                try
+                {
+                    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                    connected = await adapter.CheckConnectionAsync(timeout.Token);
+                }
+                catch
+                {
+                    connected = false;
+                }
+
+                if (!ReferenceEquals(adapter, _adapter)) return;
+                IsDatabaseConnected = connected;
+                if (!connected) return;
+            }
+
+            if (!IsLive) return;
             await LiveOverview.RefreshAsync(adapter);
             if (!ReferenceEquals(adapter, _adapter)) return;
             await DefectHistory.RefreshAsync(adapter);
@@ -96,8 +128,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
         catch
         {
-            // 라인 오프라인/쿼리 실패는 다음 tick에서 재시도 — MVP 단계에서는 조용히 무시,
-            // phase 3에서 라인별 연결 상태 배지로 노출 예정.
+            // 테이블 조회 오류는 연결 실패와 구분하고 다음 tick에서 재시도한다.
         }
         finally
         {
