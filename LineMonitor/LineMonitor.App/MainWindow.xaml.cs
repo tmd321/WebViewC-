@@ -220,7 +220,7 @@ public partial class MainWindow : Window
 
         if (control is Controls.MismatchPanel mismatchPanel)
         {
-            mismatchPanel.SetBinding(Controls.MismatchPanel.IsPositiveElectrodeProperty,
+            mismatchPanel.SetBinding(Controls.MismatchPanel.IsCathodeElectrodeProperty,
                 new Binding(nameof(MainViewModel.ShowInsulation)) { Source = source });
         }
 

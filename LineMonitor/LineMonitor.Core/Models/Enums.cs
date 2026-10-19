@@ -8,8 +8,10 @@ public enum Side
 
 public enum ElectrodeType
 {
-    Positive,
-    Negative
+    /// <summary>양극.</summary>
+    Cathode,
+    /// <summary>음극.</summary>
+    Anode
 }
 
 /// <summary>

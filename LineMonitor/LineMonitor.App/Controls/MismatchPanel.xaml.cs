@@ -15,13 +15,13 @@ public partial class MismatchPanel : UserControl
     public static readonly DependencyProperty RightLabelProperty =
         DependencyProperty.Register(nameof(RightLabel), typeof(string), typeof(MismatchPanel), new PropertyMetadata("OS"));
 
-    public static readonly DependencyProperty IsPositiveElectrodeProperty =
-        DependencyProperty.Register(nameof(IsPositiveElectrode), typeof(bool), typeof(MismatchPanel), new PropertyMetadata(true));
+    public static readonly DependencyProperty IsCathodeElectrodeProperty =
+        DependencyProperty.Register(nameof(IsCathodeElectrode), typeof(bool), typeof(MismatchPanel), new PropertyMetadata(true));
 
-    public bool IsPositiveElectrode
+    public bool IsCathodeElectrode
     {
-        get => (bool)GetValue(IsPositiveElectrodeProperty);
-        set => SetValue(IsPositiveElectrodeProperty, value);
+        get => (bool)GetValue(IsCathodeElectrodeProperty);
+        set => SetValue(IsCathodeElectrodeProperty, value);
     }
 
     public string Title

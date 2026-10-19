@@ -56,8 +56,8 @@ public partial class LineSelectWindow : Window
 
                 foreach (var (electrodeType, label) in new[]
                          {
-                             (ElectrodeType.Positive, "양극"),
-                             (ElectrodeType.Negative, "음극")
+                             (ElectrodeType.Cathode, "양극"),
+                             (ElectrodeType.Anode, "음극")
                          })
                 {
                     var electrodeRow = new Border

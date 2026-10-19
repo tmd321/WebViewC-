@@ -19,7 +19,7 @@ public sealed class LineAdapterFactory
         _mockSampleImageProvider = mockSampleImageProvider;
     }
 
-    public ILineAdapter Create(LineId lineId, ElectrodeType electrodeType = ElectrodeType.Positive)
+    public ILineAdapter Create(LineId lineId, ElectrodeType electrodeType = ElectrodeType.Cathode)
     {
         var profile = LineProfile.All[lineId];
         var connectionString = _options.ConnectionStrings.GetValueOrDefault($"{lineId}.{electrodeType}")
@@ -30,8 +30,8 @@ public sealed class LineAdapterFactory
         {
             ILineAdapter? real = lineId switch
             {
-                LineId.Dong4Coater => new Dong4CoaterPostgresAdapter(connectionString, electrodeType == ElectrodeType.Positive),
-                LineId.Dong9Coater => new Dong9CoaterPostgresAdapter(connectionString, electrodeType == ElectrodeType.Positive),
+                LineId.Dong4Coater => new Dong4CoaterPostgresAdapter(connectionString, electrodeType == ElectrodeType.Cathode),
+                LineId.Dong9Coater => new Dong9CoaterPostgresAdapter(connectionString, electrodeType == ElectrodeType.Cathode),
                 // 나머지 라인은 실제 스키마에 맞는 어댑터가 구현될 때 추가한다.
                 _ => null
             };

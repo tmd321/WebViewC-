@@ -29,7 +29,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [NotifyPropertyChangedFor(nameof(ShowInsulation))]
     private ElectrodeType _selectedElectrode;
 
-    public bool ShowInsulation => SelectedElectrode == ElectrodeType.Positive;
+    public bool ShowInsulation => SelectedElectrode == ElectrodeType.Cathode;
 
     [ObservableProperty]
     private bool _isLive = true;
@@ -46,7 +46,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     };
 
     public string SelectionDisplayName =>
-        $"{SelectedLine.DisplayName} · {(SelectedElectrode == ElectrodeType.Positive ? "양극" : "음극")}";
+        $"{SelectedLine.DisplayName} · {(SelectedElectrode == ElectrodeType.Cathode ? "양극" : "음극")}";
 
     public LiveOverviewViewModel LiveOverview { get; } = new();
     public DefectHistoryViewModel DefectHistory { get; } = new();
@@ -56,7 +56,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         LineAdapterFactory factory,
         LineMonitorOptions options,
         LineId? initialLineId = null,
-        ElectrodeType initialElectrodeType = ElectrodeType.Positive)
+        ElectrodeType initialElectrodeType = ElectrodeType.Cathode)
     {
         _factory = factory;
         Lines = new ObservableCollection<LineProfile>(LineProfile.All.Values);
