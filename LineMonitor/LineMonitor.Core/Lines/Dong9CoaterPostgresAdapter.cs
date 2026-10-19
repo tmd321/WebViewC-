@@ -216,14 +216,13 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
         {
             var cuttingWidths = await GetLatestCuttingWidthsAsync(displayFrame.LotId, ct);
             var dsLane = laneCount / 2;
-            var osLane = laneCount - dsLane;
-            // OS는 반대 끝에서 세므로 DS 컷 바로 오른쪽 레인에 표시한다.
+            var osLane = dsLane + 1;
             lanes[dsLane - 1] = lanes[dsLane - 1] with
             {
                 CutLabel = $"{dsLane} Lane Cut",
                 CutWidth = cuttingWidths.GetValueOrDefault(1)
             };
-            lanes[dsLane] = lanes[dsLane] with
+            lanes[osLane - 1] = lanes[osLane - 1] with
             {
                 CutLabel = $"{osLane} Lane Cut",
                 CutWidth = cuttingWidths.GetValueOrDefault(0)
