@@ -16,7 +16,7 @@
 
     <Window.Resources>
         <conv:BoolToLiveBrushConverter x:Key="LiveBrush2" />
-        <Style x:Key="LayoutPresetTab" TargetType="RadioButton">
+        <Style x:Key="LayoutPresetTab" TargetType="Button">
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="FontSize" Value="16" />
@@ -26,7 +26,7 @@
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
-                    <ControlTemplate TargetType="RadioButton">
+                    <ControlTemplate TargetType="Button">
                         <Border Background="{TemplateBinding Background}" CornerRadius="5"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter />
@@ -38,7 +38,7 @@
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="{StaticResource SidebarHoverBrush}" />
                 </Trigger>
-                <Trigger Property="IsChecked" Value="True">
+                <Trigger Property="IsPressed" Value="True">
                     <Setter Property="Background" Value="{StaticResource AccentBrush}" />
                     <Setter Property="Foreground" Value="White" />
                 </Trigger>
@@ -50,7 +50,7 @@
         <!-- 커스텀 타이틀바: 어두운 회색 바탕 + 흰 글씨, 창 기본 크롬 대신 직접 그림 -->
         <Border DockPanel.Dock="Top" Background="#2B2F36" Height="36" MouseLeftButtonDown="OnTitleBarMouseLeftButtonDown">
             <Grid>
-                <TextBlock Text="라인 실시간 모니터링" Foreground="White" FontSize="17" FontWeight="SemiBold"
+                <TextBlock x:Name="WindowTitleText" Text="라인 실시간 모니터링" Foreground="White" FontSize="17" FontWeight="SemiBold"
                            VerticalAlignment="Center" HorizontalAlignment="Left" Margin="14,0,0,0" />
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Style="{StaticResource TitleBarButton}" Click="OnMinimizeClick" ToolTip="최소화">
@@ -70,7 +70,7 @@
         </Border>
 
         <!-- 상단 바: 라인 선택, Live 상태, UI 프리셋 -->
-        <Border DockPanel.Dock="Top" Background="{StaticResource BgBrush}" Padding="12,8" MinHeight="48">
+        <Border x:Name="MainToolbar" DockPanel.Dock="Top" Background="{StaticResource BgBrush}" Padding="12,8" MinHeight="48">
             <!-- 단일 셀 Grid: 자식들이 Margin+HorizontalAlignment=Left로 각자 독립 배치됨 -->
             <!-- VS 디자이너에서 이 안의 요소를 마우스로 드래그하면 Margin이 자동으로 갱신됨(MFC 다이얼로그 에디터처럼) -->
             <Grid>
@@ -88,12 +88,12 @@
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left"
-                            Margin="300,0,0,0" ToolTip="배치는 프리셋 전환·라인 변경·종료 시 자동 저장됩니다.">
-                    <RadioButton x:Name="LayoutPreset1Button" Content="UI 프리셋1" Tag="1"
-                                 GroupName="LayoutPreset" IsChecked="True" Style="{StaticResource LayoutPresetTab}"
+                            Margin="300,0,0,0" ToolTip="별도 작업창을 엽니다. 배치는 작업창을 닫거나 프로그램 종료 시 자동 저장됩니다.">
+                    <Button x:Name="LayoutPreset1Button" Content="UI 프리셋1" Tag="1"
+                                 Style="{StaticResource LayoutPresetTab}"
                                  Click="OnLayoutPresetClick" />
-                    <RadioButton x:Name="LayoutPreset2Button" Content="UI 프리셋2" Tag="2"
-                                 GroupName="LayoutPreset" Style="{StaticResource LayoutPresetTab}"
+                    <Button x:Name="LayoutPreset2Button" Content="UI 프리셋2" Tag="2"
+                                 Style="{StaticResource LayoutPresetTab}"
                                  Click="OnLayoutPresetClick" />
                 </StackPanel>
 
@@ -112,7 +112,7 @@
             </Grid>
         </Border>
 
-        <Border DockPanel.Dock="Top" Background="{StaticResource BgBrush}" Padding="8,0,8,4">
+        <Border x:Name="MainSummaryBar" DockPanel.Dock="Top" Background="{StaticResource BgBrush}" Padding="8,0,8,4">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="200" />
@@ -222,7 +222,7 @@
             <Grid Grid.Column="3">
                 <ScrollViewer x:Name="BoxesScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                               AllowDrop="True" DragOver="OnCanvasDragOver" Drop="OnCanvasDrop">
-                    <ItemsControl x:Name="BoxesPanel" Margin="8">
+                    <ItemsControl x:Name="BoxesPanel" Margin="8" Grid.IsSharedSizeScope="True">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <Canvas Width="4000" Height="3000" />

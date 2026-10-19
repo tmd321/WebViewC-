@@ -103,7 +103,7 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="LaneStripLabels" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="110" />
                 </Grid.ColumnDefinitions>

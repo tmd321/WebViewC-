@@ -41,7 +41,9 @@ public partial class MainWindow : Window
 
     private bool _sidebarExpanded = true;
     private double _sidebarExpandedWidth = 228;
-    private int _selectedLayoutPreset = 1;
+    private readonly int _selectedLayoutPreset;
+    private readonly bool _isPresetWindow;
+    private readonly Dictionary<int, MainWindow> _presetWindows = new();
     private Point? _catalogDragStart;
     private DashboardBoxModel? _catalogDragCandidate;
 
@@ -49,9 +51,25 @@ public partial class MainWindow : Window
     private DashboardBoxModel? _selectionAnchor;
     private int _nextZIndex = 1;
 
-    public MainWindow()
+    public MainWindow() : this(1, false)
     {
+    }
+
+    private MainWindow(int layoutPreset, bool isPresetWindow)
+    {
+        _selectedLayoutPreset = layoutPreset;
+        _isPresetWindow = isPresetWindow;
         InitializeComponent();
+        if (_isPresetWindow)
+        {
+            MainToolbar.Visibility = Visibility.Collapsed;
+            MainSummaryBar.Visibility = Visibility.Collapsed;
+            SetBinding(TitleProperty, new Binding(nameof(MainViewModel.SelectionDisplayName))
+            {
+                StringFormat = $"{{0}} · UI 프리셋{layoutPreset}"
+            });
+            WindowTitleText.SetBinding(TextBlock.TextProperty, new Binding(nameof(Title)) { Source = this });
+        }
         _visibleBoxes.CollectionChanged += (_, _) =>
             EmptyCanvasHint.Visibility = _visibleBoxes.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         Loaded += OnLoaded;
@@ -643,6 +661,11 @@ public partial class MainWindow : Window
             }
 
             if (!SaveLayout(vm)) return;
+            foreach (var window in _presetWindows.Values.ToList())
+            {
+                window.Close();
+                if (window.IsVisible) return;
+            }
             vm.SelectLine(lineId, electrodeType);
             ResetLayout();
             RestoreSavedLayout(vm);
@@ -667,29 +690,39 @@ public partial class MainWindow : Window
 
     private void OnLayoutPresetClick(object sender, RoutedEventArgs e)
     {
-        if (sender is not RadioButton { Tag: string presetText } ||
+        if (_isPresetWindow || sender is not Button { Tag: string presetText } ||
             !int.TryParse(presetText, out var preset) || preset is < 1 or > 2 ||
-            preset == _selectedLayoutPreset || DataContext is not MainViewModel viewModel)
+            DataContext is not MainViewModel viewModel)
         {
             return;
         }
 
-        if (!SaveLayout(viewModel))
+        if (_presetWindows.TryGetValue(preset, out var existing))
         {
-            LayoutPreset1Button.IsChecked = _selectedLayoutPreset == 1;
-            LayoutPreset2Button.IsChecked = _selectedLayoutPreset == 2;
+            if (existing.WindowState == WindowState.Minimized) existing.WindowState = WindowState.Normal;
+            existing.Activate();
             return;
         }
 
-        _selectedLayoutPreset = preset;
-        ResetLayout();
-        RestoreSavedLayout(viewModel);
+        if (!SaveLayout(viewModel)) return;
+
+        var window = new MainWindow(preset, true)
+        {
+            Owner = this,
+            DataContext = viewModel,
+            Width = ActualWidth,
+            Height = ActualHeight,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner
+        };
+        _presetWindows.Add(preset, window);
+        window.Closed += (_, _) => _presetWindows.Remove(preset);
+        window.Show();
     }
 
-    private string GetLayoutFilePath(MainViewModel viewModel)
+    private string GetLayoutFilePath(MainViewModel viewModel, bool mainLayout = false)
     {
-        // 기존 단일 배치 파일을 프리셋1로 그대로 사용한다.
-        var presetSuffix = _selectedLayoutPreset == 1 ? "" : ".Preset2";
+        // 메인 배치와 별도 창의 저장 파일을 분리하되 기존 프리셋2 경로는 유지한다.
+        var presetSuffix = !_isPresetWindow || mainLayout ? "" : $".Preset{_selectedLayoutPreset}";
         return Path.Combine(LayoutDirectory,
             $"{viewModel.SelectedLine.LineId}.{viewModel.SelectedElectrode}{presetSuffix}.layout.json");
     }
@@ -719,6 +752,11 @@ public partial class MainWindow : Window
     private void RestoreSavedLayout(MainViewModel viewModel)
     {
         var layoutFilePath = GetLayoutFilePath(viewModel);
+        if (_isPresetWindow && _selectedLayoutPreset == 1 && !File.Exists(layoutFilePath))
+        {
+            // 기존 프리셋1은 메인 배치 파일에 저장되어 있어 최초 실행 때만 이어받는다.
+            layoutFilePath = GetLayoutFilePath(viewModel, mainLayout: true);
+        }
         if (!File.Exists(layoutFilePath))
         {
             return;
@@ -782,6 +820,15 @@ public partial class MainWindow : Window
     {
         if (DataContext is MainViewModel viewModel)
         {
+            // 소유 창이 닫힐 때도 각 프리셋의 배치를 먼저 저장한다.
+            foreach (var window in _presetWindows.Values.ToList())
+            {
+                if (!window.SaveLayout(viewModel))
+                {
+                    e.Cancel = true;
+                    return;
+                }
+            }
             e.Cancel = !SaveLayout(viewModel);
         }
     }

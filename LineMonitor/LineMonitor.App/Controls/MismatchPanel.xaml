@@ -2,8 +2,10 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:LineMonitor.Core.Models;assembly=LineMonitor.Core"
+             xmlns:conv="clr-namespace:LineMonitor.App.Converters"
              x:Name="Root">
     <UserControl.Resources>
+        <conv:MismatchBarMarginConverter x:Key="MismatchBarMargin" />
         <Style x:Key="MaterialStrip" TargetType="Border">
             <Setter Property="Background" Value="#C0C0C0" />
             <Setter Property="Height" Value="4" />
@@ -43,7 +45,21 @@
                 </Border>
             </Grid>
 
-            <ItemsControl ItemsSource="{Binding}">
+            <Grid Margin="24,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="LaneStripLabels" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="110" />
+                </Grid.ColumnDefinitions>
+                <Grid Width="50" Height="32" VerticalAlignment="Top" Margin="0,2,6,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="Back" FontSize="14" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                    <TextBlock Grid.Row="1" Text="Top" FontSize="14" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                </Grid>
+            <ItemsControl Grid.Column="1" ItemsSource="{Binding}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                         <UniformGrid Rows="1" />
@@ -52,17 +68,23 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="{x:Type vm:LaneMismatch}">
                         <StackPanel Margin="0,2">
-                            <Grid Height="16" Margin="0,0,0,4">
-                                <Border Height="6" Background="Black" VerticalAlignment="Top" Margin="2,0" />
-                                <Border Height="6" Background="Black" VerticalAlignment="Bottom" Margin="2,0" />
-                                <Border Style="{StaticResource MaterialStrip}" />
+                            <Grid Height="32" Margin="0,0,0,4">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <Border Grid.Row="0" Height="11" Background="Black" VerticalAlignment="Center"
+                                        Margin="{Binding Converter={StaticResource MismatchBarMargin}, ConverterParameter=Back}" />
+                                <Border Grid.Row="1" Height="11" Background="Black" VerticalAlignment="Center"
+                                        Margin="{Binding Converter={StaticResource MismatchBarMargin}, ConverterParameter=Top}" />
+                                <Border Grid.RowSpan="2" Style="{StaticResource MaterialStrip}" />
                             </Grid>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <TextBlock Text="{Binding Left, StringFormat='{}{0:0.00}'}"
+                                <TextBlock Text="{Binding Left, StringFormat='{}{0:0.00}', TargetNullValue=-}"
                                            FontWeight="Bold" FontSize="20"
                                            Foreground="Black" Margin="0,0,4,0" />
                                 <TextBlock Text="|" Style="{StaticResource MutedText}" Foreground="Black" Margin="0,0,4,0" />
-                                <TextBlock Text="{Binding Right, StringFormat='{}{0:0.00}'}"
+                                <TextBlock Text="{Binding Right, StringFormat='{}{0:0.00}', TargetNullValue=-}"
                                            FontWeight="Bold" FontSize="20"
                                            Foreground="Black" />
                             </StackPanel>
@@ -70,6 +92,7 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+            </Grid>
         </StackPanel>
     </Border>
 </UserControl>

@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using LineMonitor.Core.Models;
 
 namespace LineMonitor.App.Converters;
 
@@ -55,6 +56,25 @@ public sealed class StringToImageSourceConverter : IValueConverter
         {
             return null;
         }
+    }
+
+    public object ConvertBack(object value, Type targetType, object? parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
+/// <summary>Shows the sign of each edge mismatch with a small inset, not a physical mm scale.</summary>
+public sealed class MismatchBarMarginConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is not LaneMismatch lane) return new Thickness(4, 0, 4, 0);
+
+        var isBack = string.Equals(parameter as string, "Back", StringComparison.Ordinal);
+        var left = lane.Left.GetValueOrDefault();
+        var right = lane.Right.GetValueOrDefault();
+        return new Thickness(
+            (isBack ? left < 0 : left > 0) ? 11 : 4, 0,
+            (isBack ? right < 0 : right > 0) ? 11 : 4, 0);
     }
 
     public object ConvertBack(object value, Type targetType, object? parameter, CultureInfo culture) =>

@@ -25,14 +25,14 @@ public partial class DefectPivotTable : UserControl
     {
         if (_viewModel is not null)
         {
-            _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+            PropertyChangedEventManager.RemoveHandler(_viewModel, OnViewModelPropertyChanged, string.Empty);
         }
 
         _viewModel = e.NewValue as DefectHistoryViewModel;
 
         if (_viewModel is not null)
         {
-            _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+            PropertyChangedEventManager.AddHandler(_viewModel, OnViewModelPropertyChanged, string.Empty);
             RebuildPivotColumns();
         }
     }
