@@ -65,6 +65,8 @@ public partial class MainWindow : Window
         {
             MainToolbar.Visibility = Visibility.Collapsed;
             MainSummaryBar.Visibility = Visibility.Collapsed;
+            BoxesPanel.ItemsPanel = (ItemsPanelTemplate)Resources["PresetBoxesPanel"];
+            BoxesScrollViewer.HorizontalContentAlignment = HorizontalAlignment.Stretch;
             SetBinding(TitleProperty, new Binding(nameof(MainViewModel.SelectionDisplayName))
             {
                 StringFormat = $"{{0}} · UI 프리셋{layoutPreset}"
@@ -767,8 +769,9 @@ public partial class MainWindow : Window
             DataContext = viewModel,
             Width = ActualWidth,
             Height = ActualHeight,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner
+            WindowStartupLocation = WindowStartupLocation.Manual
         };
+        window.SourceInitialized += (_, _) => Services.WindowPlacement.FitToOwnerWorkArea(window, this);
         _presetWindows.Add(preset, window);
         window.Closed += (_, _) => _presetWindows.Remove(preset);
         window.Show();

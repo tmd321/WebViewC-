@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:LineMonitor.App"
+        xmlns:controls="clr-namespace:LineMonitor.App.Controls"
         xmlns:conv="clr-namespace:LineMonitor.App.Converters"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         mc:Ignorable="d"
@@ -16,6 +17,9 @@
 
     <Window.Resources>
         <conv:BoolToLiveBrushConverter x:Key="LiveBrush2" />
+        <ItemsPanelTemplate x:Key="PresetBoxesPanel">
+            <controls:WorkspaceCanvas Height="3000" />
+        </ItemsPanelTemplate>
         <Style x:Key="ErrorProofButton" TargetType="Button">
             <Setter Property="Background" Value="#B9DEE5" />
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
