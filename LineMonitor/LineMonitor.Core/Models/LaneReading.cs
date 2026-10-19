@@ -85,7 +85,11 @@ public sealed record LaneWetDry(
     decimal? InsulWetLeft,
     decimal? InsulWetRight,
     decimal? InsulDryLeft,
-    decimal? InsulDryRight);
+    decimal? InsulDryRight)
+{
+    public string? CutLabel { get; init; }
+    public decimal? CutWidth { get; init; }
+}
 
 /// <summary>
 /// 스트라이프(간헐) 코팅 한 구간: 코팅부(Coat) + 다음 패턴 전까지의 무지부(Foil, 미코팅 구간).

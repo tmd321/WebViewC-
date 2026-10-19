@@ -204,11 +204,52 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
                 InsulDryRight: dryByLane.GetValueOrDefault(lane)?.InsulRight))
             .ToList();
 
+        if (side == Side.Back && laneCount is >= 6 and <= 8)
+        {
+            var cuttingWidths = await GetLatestCuttingWidthsAsync(displayFrame.LotId, ct);
+            var dsLane = laneCount / 2;
+            var osLane = laneCount - dsLane;
+            // OS는 반대 끝에서 세므로 DS 컷 바로 오른쪽 레인에 표시한다.
+            lanes[dsLane - 1] = lanes[dsLane - 1] with
+            {
+                CutLabel = $"{dsLane} Lane Cut",
+                CutWidth = cuttingWidths.GetValueOrDefault(1)
+            };
+            lanes[dsLane] = lanes[dsLane] with
+            {
+                CutLabel = $"{osLane} Lane Cut",
+                CutWidth = cuttingWidths.GetValueOrDefault(0)
+            };
+        }
+
         var avrWet = AverageValues(lanes.Select(lane => lane.Wet));
         var avrDry = AverageValues(lanes.Select(lane => lane.Dry));
 
         // 9동 코터는 스트라이프 패턴 코팅 없음(HasPatternCoating:false) — 빈 목록.
         return new SideMeasurement(displayFrame.LotId, displayFrame.Meter, side, edges, lanes, avrWet, avrDry, Array.Empty<PatternSegment>());
+    }
+
+    private async Task<Dictionary<int, decimal?>> GetLatestCuttingWidthsAsync(string lotId, CancellationToken ct)
+    {
+        const string sql = """
+            select distinct on (cam_index) cam_index, null_width
+            from public.cutting_width
+            where lot_id = @lotId and cam_index in (0, 1)
+            order by cam_index, id desc
+            """;
+
+        await using var conn = new NpgsqlConnection(_connectionString);
+        await conn.OpenAsync(ct);
+        await using var cmd = new NpgsqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("lotId", lotId);
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+
+        var widths = new Dictionary<int, decimal?>();
+        while (await reader.ReadAsync(ct))
+        {
+            widths.Add(reader.GetInt32(0), ReadDecimal(reader, "null_width"));
+        }
+        return widths;
     }
 
     public async Task<IReadOnlyList<LaneSeries>> GetRecentSeriesAsync(SeriesKind kind, Side side, int take, CancellationToken ct = default)
