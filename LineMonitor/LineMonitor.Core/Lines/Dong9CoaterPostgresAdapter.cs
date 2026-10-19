@@ -131,7 +131,7 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
     public async Task<MismatchSnapshot?> GetLatestMismatchAsync(Stage stage, CancellationToken ct = default)
     {
         const string sql = """
-            select lot_id, grap_time,
+            select lot_id, grap_time, lane_count,
                    lane_1_l_mismatch, lane_1_r_mismatch, lane_2_l_mismatch, lane_2_r_mismatch,
                    lane_3_l_mismatch, lane_3_r_mismatch, lane_4_l_mismatch, lane_4_r_mismatch,
                    lane_5_l_mismatch, lane_5_r_mismatch, lane_6_l_mismatch, lane_6_r_mismatch,
@@ -153,8 +153,10 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
             return null;
         }
 
+        var laneCountOrdinal = reader.GetOrdinal("lane_count");
+        var laneCount = Math.Clamp(reader.IsDBNull(laneCountOrdinal) ? 8 : reader.GetInt32(laneCountOrdinal), 1, 8);
         var lanes = new List<LaneMismatch>();
-        for (var lane = 1; lane <= 8; lane++)
+        for (var lane = 1; lane <= laneCount; lane++)
         {
             lanes.Add(new LaneMismatch(
                 lane,
