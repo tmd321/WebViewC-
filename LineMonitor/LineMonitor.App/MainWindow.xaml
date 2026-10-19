@@ -101,11 +101,11 @@
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,90,0">
                     <TextBlock Text="크기 맞춤: " VerticalAlignment="Center" Style="{StaticResource MutedText}" Margin="0,0,6,0" />
                     <Button x:Name="MatchWidthButton" Content="가로" Style="{StaticResource PillButton}" Padding="10,4"
-                            Margin="0,0,4,0" IsEnabled="False" Click="OnMatchWidthClick" ToolTip="마지막으로 고른 박스 가로에 맞춤" />
+                            Margin="0,0,4,0" IsEnabled="False" Click="OnMatchWidthClick" ToolTip="기준 박스의 너비와 왼쪽 위치에 맞춤" />
                     <Button x:Name="MatchHeightButton" Content="세로" Style="{StaticResource PillButton}" Padding="10,4"
                             Margin="0,0,4,0" IsEnabled="False" Click="OnMatchHeightClick" ToolTip="마지막으로 고른 박스 세로에 맞춤" />
                     <Button x:Name="MatchBothButton" Content="가로+세로" Style="{StaticResource PillButton}" Padding="10,4"
-                            IsEnabled="False" Click="OnMatchBothClick" ToolTip="마지막으로 고른 박스 크기에 맞춤" />
+                            IsEnabled="False" Click="OnMatchBothClick" ToolTip="기준 박스의 크기와 왼쪽 위치에 맞춤" />
                 </StackPanel>
 
                 <Image Source="/Assets/logo.png" Height="28" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0" />

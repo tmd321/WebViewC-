@@ -56,6 +56,24 @@ public partial class MainWindow : Window
             EmptyCanvasHint.Visibility = _visibleBoxes.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         Loaded += OnLoaded;
         Closing += OnClosing;
+        PreviewMouseDown += OnWindowPreviewMouseDown;
+    }
+
+    private void OnWindowPreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_selection.Count == 0) return;
+
+        for (var current = e.OriginalSource as DependencyObject; current is not null;
+             current = current is Visual ? VisualTreeHelper.GetParent(current) : LogicalTreeHelper.GetParent(current))
+        {
+            if (_visibleBoxes.Any(box => ReferenceEquals(box.Card, current))) return;
+            // 크기 맞춤 버튼은 현재 선택을 사용하므로 해제하지 않는다.
+            if (ReferenceEquals(current, MatchWidthButton)
+                || ReferenceEquals(current, MatchHeightButton)
+                || ReferenceEquals(current, MatchBothButton)) return;
+        }
+
+        ClearSelection();
     }
 
     private void OnTitleBarMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -88,6 +106,13 @@ public partial class MainWindow : Window
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         var vm = (MainViewModel)DataContext;
+
+        BoxesScrollViewer.ApplyTemplate();
+        if (BoxesScrollViewer.Template.FindName("PART_VerticalScrollBar", BoxesScrollViewer) is FrameworkElement verticalScrollBar)
+        {
+            verticalScrollBar.Width = 24;
+            verticalScrollBar.MinWidth = 24;
+        }
 
         _allBoxes.Add(CreateBox("TopMeasurement", "TOP 측정",
             BindControl(new Controls.SidePanel { Title = "TOP" }, vm, "LiveOverview.TopMeasurement")));
@@ -172,9 +197,13 @@ public partial class MainWindow : Window
             Padding = new Thickness(0),
             FontSize = 15,
             VerticalAlignment = VerticalAlignment.Center,
-            ToolTip = "가로 기본 크기로"
+            ToolTip = "가로 최대 너비에 맞춤"
         };
-        fitWidthButton.Click += (_, _) => ResizeBox(model, DefaultCardWidth, card.Height);
+        fitWidthButton.Click += (_, _) =>
+        {
+            var maxWidth = GetMaxCardWidth();
+            if (maxWidth > 0) ResizeBox(model, maxWidth, card.Height);
+        };
 
         var fitHeightButton = new Button
         {
@@ -385,9 +414,22 @@ public partial class MainWindow : Window
         model.Y = y;
     }
 
+    private double GetMaxCardWidth()
+    {
+        // 목록을 접어도 펼쳤을 때의 작업 영역 폭을 기준으로 한다.
+        var sidebarReserve = _sidebarExpanded ? 0 : _sidebarExpandedWidth + SidebarWidthSplitter.Width;
+        return Math.Max(0, BoxesScrollViewer.ViewportWidth - sidebarReserve
+            - BoxesPanel.Margin.Left - BoxesPanel.Margin.Right);
+    }
+
     private void ResizeBox(DashboardBoxModel model, double width, double height)
     {
         if (model.Card is not FrameworkElement card) return;
+        if (width > card.Width)
+        {
+            var maxWidth = GetMaxCardWidth();
+            if (maxWidth > 0) width = Math.Min(width, Math.Max(card.Width, maxWidth));
+        }
         var obstacles = OtherBoxBounds(model).ToList();
         foreach (var bounds in obstacles)
         {
@@ -507,6 +549,14 @@ public partial class MainWindow : Window
             if (model == anchor || model.Card is not FrameworkElement fe)
             {
                 continue;
+            }
+
+            if (matchWidth)
+            {
+                // 먼저 필요한 만큼 줄여 정렬에 불필요한 충돌이 생기지 않게 한다.
+                ResizeBox(model, Math.Min(fe.Width, anchorFe.ActualWidth),
+                    matchHeight ? Math.Min(fe.Height, anchorFe.ActualHeight) : fe.Height);
+                MoveBox(model, anchor.X, model.Y);
             }
 
             ResizeBox(model, matchWidth ? anchorFe.ActualWidth : fe.Width,
