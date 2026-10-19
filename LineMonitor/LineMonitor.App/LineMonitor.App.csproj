@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <Resource Include="Assets\logo.png" />
+    <Resource Include="..\logo\App.ico" Link="Assets\App.ico" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -28,6 +29,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>..\logo\App.ico</ApplicationIcon>
   </PropertyGroup>
 
 </Project>
