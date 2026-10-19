@@ -1,5 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -120,6 +121,60 @@ public partial class MainWindow : Window
 
     private void ToggleMaximize() =>
         WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+
+    private void OnOpenErrorProofResultsClick(object sender, RoutedEventArgs e)
+    {
+        const string folderPath = @"D:\Data\ErrorProof\";
+        if (!Directory.Exists(folderPath))
+        {
+            MessageBox.Show(this, $"결과 폴더가 없습니다.\n{folderPath}",
+                "에러프루프 결과", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(folderPath) { UseShellExecute = true });
+        }
+        catch (Exception exception) when (exception is Win32Exception or InvalidOperationException
+            or IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            MessageBox.Show(this, $"결과 폴더를 열지 못했습니다.\n{exception.Message}",
+                "에러프루프 결과", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private async void OnStartErrorProofClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || !button.IsEnabled || DataContext is not MainViewModel viewModel) return;
+
+        var selectionName = viewModel.SelectionDisplayName;
+        button.IsEnabled = false;
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var updatedRows = await viewModel.StartErrorProofAsync(timeout.Token);
+            if (updatedRows == 0)
+            {
+                MessageBox.Show(this, $"{selectionName}\nerror_proofing_signal 테이블에 갱신할 행이 없습니다.",
+                    "에러프루프 시작", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            MessageBox.Show(this, $"{selectionName}\n요청 시간이 초과되었습니다. 재시도하기 전에 DB의 is_start 상태를 확인해 주세요.",
+                "에러프루프 시작", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(this, $"{selectionName}\n시작 신호 전송 결과를 확인하지 못했습니다.\n{exception.Message}",
+                "에러프루프 시작", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            button.IsEnabled = true;
+        }
+    }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {

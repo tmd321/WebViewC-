@@ -37,6 +37,9 @@ public sealed class MockLineAdapter : ILineAdapter
 
     public Task<bool> CheckConnectionAsync(CancellationToken ct = default) => Task.FromResult(false);
 
+    public Task<int> StartErrorProofAsync(CancellationToken ct = default) =>
+        Task.FromException<int>(new NotSupportedException("모의 데이터 모드에서는 에러프루프 시작 신호를 전송할 수 없습니다."));
+
     public Task<FrameSnapshot?> GetLatestFrameAsync(Side side, CancellationToken ct = default)
     {
         var lanes = Enumerable.Range(1, Profile.LaneCount)

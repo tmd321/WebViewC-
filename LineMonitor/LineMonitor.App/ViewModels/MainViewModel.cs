@@ -90,6 +90,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _ = TickAsync();
     }
 
+    public Task<int> StartErrorProofAsync(CancellationToken ct = default) => _adapter.StartErrorProofAsync(ct);
+
     private async Task TickAsync()
     {
         if (_isRefreshing)

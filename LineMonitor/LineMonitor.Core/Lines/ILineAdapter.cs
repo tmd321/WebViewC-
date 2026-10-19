@@ -12,6 +12,7 @@ public interface ILineAdapter
     LineProfile Profile { get; }
 
     Task<bool> CheckConnectionAsync(CancellationToken ct = default);
+    Task<int> StartErrorProofAsync(CancellationToken ct = default);
 
     Task<FrameSnapshot?> GetLatestFrameAsync(Side side, CancellationToken ct = default);
     Task<MismatchSnapshot?> GetLatestMismatchAsync(Stage stage, CancellationToken ct = default);

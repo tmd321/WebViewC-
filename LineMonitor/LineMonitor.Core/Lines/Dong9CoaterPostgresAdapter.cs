@@ -44,6 +44,14 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
         return true;
     }
 
+    public async Task<int> StartErrorProofAsync(CancellationToken ct = default)
+    {
+        await using var conn = new NpgsqlConnection(_connectionString);
+        await conn.OpenAsync(ct);
+        await using var cmd = new NpgsqlCommand("UPDATE public.error_proofing_signal SET is_start = true", conn);
+        return await cmd.ExecuteNonQueryAsync(ct);
+    }
+
     private static int FramePcIndexFor(Side side, Stage stage) => (side, stage) switch
     {
         (Side.Top, Stage.Wet) => 0,

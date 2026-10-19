@@ -16,6 +16,21 @@
 
     <Window.Resources>
         <conv:BoolToLiveBrushConverter x:Key="LiveBrush2" />
+        <Style x:Key="ErrorProofButton" TargetType="Button">
+            <Setter Property="Background" Value="#B9DEE5" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="12,4" />
+            <Setter Property="MinHeight" Value="44" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.5" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
         <Style x:Key="LayoutPresetTab" TargetType="Button">
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
             <Setter Property="Background" Value="Transparent" />
@@ -71,9 +86,13 @@
 
         <!-- 상단 바: 라인 선택, Live 상태, UI 프리셋 -->
         <Border x:Name="MainToolbar" DockPanel.Dock="Top" Background="{StaticResource BgBrush}" Padding="12,8" MinHeight="48">
-            <!-- 단일 셀 Grid: 자식들이 Margin+HorizontalAlignment=Left로 각자 독립 배치됨 -->
-            <!-- VS 디자이너에서 이 안의 요소를 마우스로 드래그하면 Margin이 자동으로 갱신됨(MFC 다이얼로그 에디터처럼) -->
             <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
                 <TextBlock Text="{Binding SelectionDisplayName}" FontSize="18" FontWeight="SemiBold"
                            VerticalAlignment="Center" HorizontalAlignment="Left" Margin="0"
                            Cursor="Hand" ToolTip="더블클릭해서 라인 변경"
@@ -98,7 +117,7 @@
                 </StackPanel>
 
                 <!-- Ctrl+클릭으로 박스 여러 개 고른 뒤 마지막으로 고른 박스 크기에 맞춤(MFC "동일하게" 기능) -->
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,90,0">
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
                     <TextBlock Text="크기 맞춤: " VerticalAlignment="Center" Style="{StaticResource MutedText}" Margin="0,0,6,0" />
                     <Button x:Name="MatchWidthButton" Content="가로" Style="{StaticResource PillButton}" Padding="10,4"
                             Margin="0,0,4,0" IsEnabled="False" Click="OnMatchWidthClick" ToolTip="기준 박스의 너비와 왼쪽 위치에 맞춤" />
@@ -108,7 +127,19 @@
                             IsEnabled="False" Click="OnMatchBothClick" ToolTip="기준 박스의 크기와 왼쪽 위치에 맞춤" />
                 </StackPanel>
 
-                <Image Source="/Assets/logo.png" Height="28" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                    <Button Style="{StaticResource ErrorProofButton}" Margin="0,0,8,0"
+                            Click="OnOpenErrorProofResultsClick" ToolTip="D:\Data\ErrorProof\ 폴더 열기">
+                        <StackPanel>
+                            <TextBlock Text="에러프루프" HorizontalAlignment="Center" />
+                            <TextBlock Text="결과 바로가기" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Content="에러프루프 시작" Style="{StaticResource ErrorProofButton}"
+                            Click="OnStartErrorProofClick" ToolTip="현재 선택한 DB에 에러프루프 시작 신호를 전송합니다." />
+                </StackPanel>
+
+                <Image Grid.Column="3" Source="/Assets/logo.png" Height="28" VerticalAlignment="Center" Margin="0" />
             </Grid>
         </Border>
 

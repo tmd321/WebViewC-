@@ -35,6 +35,14 @@ public sealed class Dong4CoaterPostgresAdapter : ILineAdapter
         return true;
     }
 
+    public async Task<int> StartErrorProofAsync(CancellationToken ct = default)
+    {
+        await using var conn = new NpgsqlConnection(_connectionString);
+        await conn.OpenAsync(ct);
+        await using var cmd = new NpgsqlCommand("UPDATE public.error_proofing_signal SET is_start = true", conn);
+        return await cmd.ExecuteNonQueryAsync(ct);
+    }
+
     public async Task<FrameSnapshot?> GetLatestFrameAsync(Side side, CancellationToken ct = default)
     {
         var insulColumns = _hasInsulation
