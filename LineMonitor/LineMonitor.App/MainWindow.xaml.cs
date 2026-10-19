@@ -42,9 +42,11 @@ public partial class MainWindow : Window
 
     private bool _sidebarExpanded = true;
     private double _sidebarExpandedWidth = 228;
-    private readonly int _selectedLayoutPreset;
-    private readonly bool _isPresetWindow;
-    private readonly Dictionary<int, MainWindow> _presetWindows = new();
+    private int _selectedLayoutPreset;
+    private readonly bool _isSecondaryWindow;
+    private bool _isHistoryView;
+    private readonly List<MainWindow> _childWindows = new();
+    private string? _lastSavedLayout;
     private Point? _catalogDragStart;
     private DashboardBoxModel? _catalogDragCandidate;
 
@@ -56,23 +58,22 @@ public partial class MainWindow : Window
     {
     }
 
-    private MainWindow(int layoutPreset, bool isPresetWindow)
+    private MainWindow(int layoutPreset, bool isSecondaryWindow)
     {
         _selectedLayoutPreset = layoutPreset;
-        _isPresetWindow = isPresetWindow;
+        _isSecondaryWindow = isSecondaryWindow;
         InitializeComponent();
-        if (_isPresetWindow)
+        WindowTitleText.SetBinding(TextBlock.TextProperty, new Binding(nameof(Title)) { Source = this });
+        if (_isSecondaryWindow)
         {
-            MainToolbar.Visibility = Visibility.Collapsed;
-            MainSummaryBar.Visibility = Visibility.Collapsed;
-            BoxesPanel.ItemsPanel = (ItemsPanelTemplate)Resources["PresetBoxesPanel"];
-            BoxesScrollViewer.HorizontalContentAlignment = HorizontalAlignment.Stretch;
-            SetBinding(TitleProperty, new Binding(nameof(MainViewModel.SelectionDisplayName))
-            {
-                StringFormat = $"{{0}} · UI 프리셋{layoutPreset}"
-            });
-            WindowTitleText.SetBinding(TextBlock.TextProperty, new Binding(nameof(Title)) { Source = this });
+            NewWindowButton.Visibility = Visibility.Collapsed;
+            LineSelectionText.Visibility = Visibility.Collapsed;
+            LiveControls.Visibility = Visibility.Collapsed;
+            ErrorProofControls.Visibility = Visibility.Collapsed;
+            ToolbarLogo.Visibility = Visibility.Collapsed;
+            NavigationControls.Margin = new Thickness(0);
         }
+        UpdateViewState();
         _visibleBoxes.CollectionChanged += (_, _) =>
             EmptyCanvasHint.Visibility = _visibleBoxes.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         Loaded += OnLoaded;
@@ -745,7 +746,7 @@ public partial class MainWindow : Window
             }
 
             if (!SaveLayout(vm)) return;
-            foreach (var window in _presetWindows.Values.ToList())
+            foreach (var window in _childWindows.ToList())
             {
                 window.Close();
                 if (window.IsVisible) return;
@@ -774,40 +775,84 @@ public partial class MainWindow : Window
 
     private void OnLayoutPresetClick(object sender, RoutedEventArgs e)
     {
-        if (_isPresetWindow || sender is not Button { Tag: string presetText } ||
+        if (sender is not Button { Tag: string presetText } ||
             !int.TryParse(presetText, out var preset) || preset is < 1 or > 2 ||
             DataContext is not MainViewModel viewModel)
         {
             return;
         }
 
-        if (_presetWindows.TryGetValue(preset, out var existing))
-        {
-            if (existing.WindowState == WindowState.Minimized) existing.WindowState = WindowState.Normal;
-            existing.Activate();
-            return;
-        }
-
+        if (!_isHistoryView && _selectedLayoutPreset == preset) return;
         if (!SaveLayout(viewModel)) return;
 
-        var window = new MainWindow(preset, true)
+        _selectedLayoutPreset = preset;
+        _isHistoryView = false;
+        ResetLayout();
+        RestoreSavedLayout(viewModel);
+        BoxesScrollViewer.ScrollToTop();
+        BoxesScrollViewer.ScrollToLeftEnd();
+        UpdateViewState();
+    }
+
+    private void OnHistoryInquiryClick(object sender, RoutedEventArgs e)
+    {
+        if (_isHistoryView || DataContext is not MainViewModel viewModel || !SaveLayout(viewModel)) return;
+
+        _isHistoryView = true;
+        ClearSelection();
+        UpdateViewState();
+    }
+
+    private void UpdateViewState()
+    {
+        DashboardWorkspace.Visibility = _isHistoryView ? Visibility.Collapsed : Visibility.Visible;
+        HistoryInquiryView.Visibility = _isHistoryView ? Visibility.Visible : Visibility.Collapsed;
+        MainSummaryBar.Visibility = _isHistoryView || _isSecondaryWindow ? Visibility.Collapsed : Visibility.Visible;
+        SizeMatchControls.Visibility = _isHistoryView ? Visibility.Collapsed : Visibility.Visible;
+        var screenName = _isHistoryView ? "이력조회" : $"UI 프리셋{_selectedLayoutPreset}";
+        SetBinding(TitleProperty, new Binding(nameof(MainViewModel.SelectionDisplayName))
         {
-            Owner = this,
+            StringFormat = $"{{0}} · {screenName}"
+        });
+
+        foreach (var (button, selected) in new[]
+                 {
+                     (LayoutPreset1Button, !_isHistoryView && _selectedLayoutPreset == 1),
+                     (LayoutPreset2Button, !_isHistoryView && _selectedLayoutPreset == 2),
+                     (HistoryInquiryButton, _isHistoryView)
+                 })
+        {
+            button.Background = selected ? (Brush)Application.Current.Resources["AccentBrush"] : Brushes.Transparent;
+            button.Foreground = selected ? Brushes.White : (Brush)Application.Current.Resources["TextBrush"];
+        }
+    }
+
+    private void OnNewWindowClick(object sender, RoutedEventArgs e)
+    {
+        var owner = this;
+        while (owner.Owner is MainWindow parent) owner = parent;
+        if (owner._childWindows.Count > 0) return;
+        if (DataContext is not MainViewModel viewModel || !SaveLayout(viewModel)) return;
+
+        var window = new MainWindow(_selectedLayoutPreset, true)
+        {
+            Owner = owner,
             DataContext = viewModel,
             Width = ActualWidth,
             Height = ActualHeight,
             WindowStartupLocation = WindowStartupLocation.Manual
         };
+        window._isHistoryView = _isHistoryView;
+        window.UpdateViewState();
         window.SourceInitialized += (_, _) => Services.WindowPlacement.FitToOwnerWorkArea(window, this);
-        _presetWindows.Add(preset, window);
-        window.Closed += (_, _) => _presetWindows.Remove(preset);
+        owner._childWindows.Add(window);
+        window.Closed += (_, _) => owner._childWindows.Remove(window);
         window.Show();
     }
 
     private string GetLayoutFilePath(MainViewModel viewModel, bool mainLayout = false)
     {
-        // 메인 배치와 별도 창의 저장 파일을 분리하되 기존 프리셋2 경로는 유지한다.
-        var presetSuffix = !_isPresetWindow || mainLayout ? "" : $".Preset{_selectedLayoutPreset}";
+        var presetSuffix = mainLayout ? "" : $".Preset{_selectedLayoutPreset}";
         return Path.Combine(LayoutDirectory,
             $"{viewModel.SelectedLine.LineId}.{viewModel.SelectedElectrode}{presetSuffix}.layout.json");
     }
@@ -836,19 +881,16 @@ public partial class MainWindow : Window
 
     private void RestoreSavedLayout(MainViewModel viewModel)
     {
-        var layoutFilePath = GetLayoutFilePath(viewModel);
-        if (_isPresetWindow && _selectedLayoutPreset == 1 && !File.Exists(layoutFilePath))
-        {
-            // 기존 프리셋1은 메인 배치 파일에 저장되어 있어 최초 실행 때만 이어받는다.
-            layoutFilePath = GetLayoutFilePath(viewModel, mainLayout: true);
-        }
-        if (!File.Exists(layoutFilePath))
-        {
-            return;
-        }
-
         try
         {
+            var layoutFilePath = GetLayoutFilePath(viewModel);
+            if (_selectedLayoutPreset == 1 && !File.Exists(layoutFilePath))
+            {
+                // 기존 프리셋1은 메인 배치 파일에 저장되어 있어 최초 실행 때만 이어받는다.
+                layoutFilePath = GetLayoutFilePath(viewModel, mainLayout: true);
+            }
+            if (!File.Exists(layoutFilePath)) return;
+
             var state = JsonSerializer.Deserialize<LayoutState>(File.ReadAllText(layoutFilePath));
             if (state is null)
             {
@@ -899,6 +941,10 @@ public partial class MainWindow : Window
         {
             // 저장된 레이아웃이 깨졌어도 기본 배치로 계속 — 앱 구동을 막지 않음.
         }
+        finally
+        {
+            _lastSavedLayout = JsonSerializer.Serialize(CaptureLayoutState());
+        }
     }
 
     private void OnClosing(object? sender, CancelEventArgs e)
@@ -906,7 +952,7 @@ public partial class MainWindow : Window
         if (DataContext is MainViewModel viewModel)
         {
             // 소유 창이 닫힐 때도 각 프리셋의 배치를 먼저 저장한다.
-            foreach (var window in _presetWindows.Values.ToList())
+            foreach (var window in _childWindows.ToList())
             {
                 if (!window.SaveLayout(viewModel))
                 {
@@ -918,25 +964,32 @@ public partial class MainWindow : Window
         }
     }
 
+    private LayoutState CaptureLayoutState() => new()
+    {
+        Visible = _allBoxes.Where(b => b.IsPlaced).Select(b => b.Id).ToList(),
+        X = _allBoxes.ToDictionary(b => b.Id, b => b.X),
+        Y = _allBoxes.ToDictionary(b => b.Id, b => b.Y),
+        Widths = _allBoxes
+            .Where(b => b.Card is FrameworkElement { Width: var w } && !double.IsNaN(w))
+            .ToDictionary(b => b.Id, b => ((FrameworkElement)b.Card!).Width),
+        Heights = _allBoxes
+            .Where(b => b.Card is FrameworkElement { Height: var h } && !double.IsNaN(h))
+            .ToDictionary(b => b.Id, b => ((FrameworkElement)b.Card!).Height)
+    };
+
     private bool SaveLayout(MainViewModel viewModel)
     {
+        // 이력조회에 진입할 때 저장했으므로 숨겨진 배치를 다시 덮어쓰지 않는다.
+        if (_isHistoryView) return true;
         try
         {
             var layoutFilePath = GetLayoutFilePath(viewModel);
+            var serializedLayout = JsonSerializer.Serialize(CaptureLayoutState());
+            // 같은 프리셋을 여러 창에서 열어도 수정하지 않은 창이 최신 배치를 덮어쓰지 않는다.
+            if (serializedLayout == _lastSavedLayout && File.Exists(layoutFilePath)) return true;
             Directory.CreateDirectory(LayoutDirectory);
-            var state = new LayoutState
-            {
-                Visible = _allBoxes.Where(b => b.IsPlaced).Select(b => b.Id).ToList(),
-                X = _allBoxes.ToDictionary(b => b.Id, b => b.X),
-                Y = _allBoxes.ToDictionary(b => b.Id, b => b.Y),
-                Widths = _allBoxes
-                    .Where(b => b.Card is FrameworkElement { Width: var w } && !double.IsNaN(w))
-                    .ToDictionary(b => b.Id, b => ((FrameworkElement)b.Card!).Width),
-                Heights = _allBoxes
-                    .Where(b => b.Card is FrameworkElement { Height: var h } && !double.IsNaN(h))
-                    .ToDictionary(b => b.Id, b => ((FrameworkElement)b.Card!).Height)
-            };
-            File.WriteAllText(layoutFilePath, JsonSerializer.Serialize(state));
+            File.WriteAllText(layoutFilePath, serializedLayout);
+            _lastSavedLayout = serializedLayout;
             return true;
         }
         catch (Exception exception)

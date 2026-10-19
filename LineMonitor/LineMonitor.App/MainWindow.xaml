@@ -17,7 +17,7 @@
 
     <Window.Resources>
         <conv:BoolToLiveBrushConverter x:Key="LiveBrush2" />
-        <ItemsPanelTemplate x:Key="PresetBoxesPanel">
+        <ItemsPanelTemplate x:Key="DashboardBoxesPanel">
             <controls:WorkspaceCanvas Height="3000" />
         </ItemsPanelTemplate>
         <Style x:Key="ErrorProofButton" TargetType="Button">
@@ -97,12 +97,12 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="{Binding SelectionDisplayName}" FontSize="18" FontWeight="SemiBold"
+                <TextBlock x:Name="LineSelectionText" Text="{Binding SelectionDisplayName}" FontSize="18" FontWeight="SemiBold"
                            VerticalAlignment="Center" HorizontalAlignment="Left" Margin="0"
                            Cursor="Hand" ToolTip="더블클릭해서 라인 변경"
                            MouseLeftButtonDown="OnLineNameMouseLeftButtonDown" />
 
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left"
+                <StackPanel x:Name="LiveControls" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left"
                             Margin="140,0,0,0">
                     <Button Content="Live 토글" Command="{Binding ToggleLiveCommand}" Style="{StaticResource PillButton}" />
                     <Ellipse Width="10" Height="10" VerticalAlignment="Center" Margin="14,0,6,0"
@@ -110,18 +110,22 @@
                     <TextBlock Text="Live" VerticalAlignment="Center" Style="{StaticResource MutedText}" />
                 </StackPanel>
 
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left"
-                            Margin="300,0,0,0" ToolTip="별도 작업창을 엽니다. 배치는 작업창을 닫거나 프로그램 종료 시 자동 저장됩니다.">
+                <StackPanel x:Name="NavigationControls" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left"
+                            Margin="300,0,0,0" ToolTip="현재 창에서 화면을 전환합니다. 별도 창은 새 창 버튼으로 엽니다.">
                     <Button x:Name="LayoutPreset1Button" Content="UI 프리셋1" Tag="1"
                                  Style="{StaticResource LayoutPresetTab}"
                                  Click="OnLayoutPresetClick" />
                     <Button x:Name="LayoutPreset2Button" Content="UI 프리셋2" Tag="2"
                                  Style="{StaticResource LayoutPresetTab}"
                                  Click="OnLayoutPresetClick" />
+                    <Button x:Name="HistoryInquiryButton" Content="이력조회"
+                            Style="{StaticResource LayoutPresetTab}" Click="OnHistoryInquiryClick" />
+                    <Button x:Name="NewWindowButton" Content="새 창" Style="{StaticResource LayoutPresetTab}"
+                            Click="OnNewWindowClick" ToolTip="현재 화면을 별도 작업창으로 엽니다." />
                 </StackPanel>
 
                 <!-- Ctrl+클릭으로 박스 여러 개 고른 뒤 마지막으로 고른 박스 크기에 맞춤(MFC "동일하게" 기능) -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                <StackPanel x:Name="SizeMatchControls" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
                     <TextBlock Text="크기 맞춤: " VerticalAlignment="Center" Style="{StaticResource MutedText}" Margin="0,0,6,0" />
                     <Button x:Name="MatchWidthButton" Content="가로" Style="{StaticResource PillButton}" Padding="10,4"
                             Margin="0,0,4,0" IsEnabled="False" Click="OnMatchWidthClick" ToolTip="기준 박스의 너비와 왼쪽 위치에 맞춤" />
@@ -131,7 +135,7 @@
                             IsEnabled="False" Click="OnMatchBothClick" ToolTip="기준 박스의 크기와 왼쪽 위치에 맞춤" />
                 </StackPanel>
 
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                <StackPanel x:Name="ErrorProofControls" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
                     <Button Style="{StaticResource ErrorProofButton}" Margin="0,0,8,0"
                             Click="OnOpenErrorProofResultsClick" ToolTip="D:\Data\ErrorProof\ 폴더 열기">
                         <StackPanel>
@@ -143,7 +147,7 @@
                             Click="OnStartErrorProofClick" ToolTip="현재 선택한 DB에 에러프루프 시작 신호를 전송합니다." />
                 </StackPanel>
 
-                <Image Grid.Column="3" Source="/Assets/logo.png" Height="28" VerticalAlignment="Center" Margin="0" />
+                <Image x:Name="ToolbarLogo" Grid.Column="3" Source="/Assets/logo.png" Height="28" VerticalAlignment="Center" Margin="0" />
             </Grid>
         </Border>
 
@@ -196,8 +200,9 @@
             </Grid>
         </Border>
 
-        <!-- 사이드바(토글 열 + 크기조절 가능한 내용 열) + 굵은 스플리터 + 작업영역, 전부 한 Grid 안 -->
         <Grid>
+        <!-- 사이드바(토글 열 + 크기조절 가능한 내용 열) + 굵은 스플리터 + 작업영역, 전부 한 Grid 안 -->
+        <Grid x:Name="DashboardWorkspace">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="40" />
                 <ColumnDefinition x:Name="SidebarContentColumn" Width="228" MinWidth="160" MaxWidth="520" />
@@ -256,13 +261,10 @@
             <!-- 작업 영역: Canvas 기반 자유배치 — 창 크기 바뀌어도 재정렬 안 되고 박스가 각자 X/Y 좌표를 유지함 -->
             <Grid Grid.Column="3">
                 <ScrollViewer x:Name="BoxesScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                              HorizontalContentAlignment="Stretch"
                               AllowDrop="True" DragOver="OnCanvasDragOver" Drop="OnCanvasDrop">
-                    <ItemsControl x:Name="BoxesPanel" Margin="8" Grid.IsSharedSizeScope="True">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <Canvas Width="4000" Height="3000" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
+                    <ItemsControl x:Name="BoxesPanel" Margin="8" Grid.IsSharedSizeScope="True"
+                                  ItemsPanel="{StaticResource DashboardBoxesPanel}">
                         <ItemsControl.ItemContainerStyle>
                             <Style TargetType="ContentPresenter">
                                 <Setter Property="Canvas.Left" Value="{Binding X}" />
@@ -284,6 +286,8 @@
                            HorizontalAlignment="Center" VerticalAlignment="Center"
                            IsHitTestVisible="False" />
             </Grid>
+        </Grid>
+            <controls:HistoryInquiryPanel x:Name="HistoryInquiryView" Visibility="Collapsed" />
         </Grid>
     </DockPanel>
 </Window>
