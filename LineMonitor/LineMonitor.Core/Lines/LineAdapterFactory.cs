@@ -32,7 +32,7 @@ public sealed class LineAdapterFactory
             {
                 LineId.Dong4Coater => new Dong4CoaterPostgresAdapter(connectionString, electrodeType == ElectrodeType.Positive),
                 LineId.Dong9Coater => new Dong9CoaterPostgresAdapter(connectionString, electrodeType == ElectrodeType.Positive),
-                // 나머지 4개 라인은 phase 2에서 같은 패턴으로 추가.
+                // 나머지 라인은 실제 스키마에 맞는 어댑터가 구현될 때 추가한다.
                 _ => null
             };
 
@@ -44,7 +44,4 @@ public sealed class LineAdapterFactory
 
         return new MockLineAdapter(profile, _mockSampleImageProvider);
     }
-
-    public IReadOnlyList<ILineAdapter> CreateAll() =>
-        LineProfile.All.Keys.Select(lineId => Create(lineId)).ToList();
 }

@@ -11,7 +11,6 @@
             <SolidColorBrush x:Key="TextBrush" Color="#1B2430" />
             <SolidColorBrush x:Key="MutedBrush" Color="#6B7686" />
             <SolidColorBrush x:Key="AccentBrush" Color="#1565D8" />
-            <SolidColorBrush x:Key="LiveBrush" Color="#1FA24A" />
             <SolidColorBrush x:Key="WarnBrush" Color="#C97A12" />
 
             <!-- 클로드 앱 사이드바 느낌: 본문보다 살짝 어두운 회백색 + 은은한 hover/selected -->

@@ -5,9 +5,7 @@ namespace LineMonitor.Core.Lines;
 
 /// <summary>
 /// Real Npgsql-backed adapter for 4동 코터 (public.frame/overlay_width/mismatch/cpk/ng/defect_code).
-/// Reference implementation for the "switch UseMock:false" phase — not wired into the UI yet
-/// since no connection string exists. The other five lines follow this same pattern once their
-/// schemas get the same treatment (see plan phase 2).
+/// Selected by LineAdapterFactory when UseMock is false and a connection string is configured.
 ///
 /// Known schema caveat: public.frame/overlay_width only carry lane_1..4 columns, while
 /// public.cpk carries lane_1..8 columns (overlay_N_lane_top_cpk etc.) — that mismatch exists

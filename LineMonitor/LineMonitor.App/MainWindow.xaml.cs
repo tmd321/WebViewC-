@@ -277,7 +277,7 @@ public partial class MainWindow : Window
         {
             if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
             {
-                ToggleSelection(model, card);
+                ToggleSelection(model);
                 e.Handled = true;
                 return;
             }
@@ -480,7 +480,7 @@ public partial class MainWindow : Window
         UpdateSizeMatchButtonsEnabled();
     }
 
-    private void ToggleSelection(DashboardBoxModel model, Border card)
+    private void ToggleSelection(DashboardBoxModel model)
     {
         var previousAnchor = _selectionAnchor;
 

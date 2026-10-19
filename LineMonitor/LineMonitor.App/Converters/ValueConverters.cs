@@ -1,9 +1,7 @@
 using System.Globalization;
-using System.IO;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using LineMonitor.Core.Models;
 
 namespace LineMonitor.App.Converters;
@@ -20,42 +18,6 @@ public sealed class NullToVisibilityConverter : IValueConverter
         }
 
         return hasValue ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    public object ConvertBack(object value, Type targetType, object? parameter, CultureInfo culture) =>
-        throw new NotSupportedException();
-}
-
-public sealed class StringToImageSourceConverter : IValueConverter
-{
-    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-        => LoadImage(value as string);
-
-    public static ImageSource? LoadImage(string? path)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return null;
-        }
-
-        try
-        {
-            using var stream = File.OpenRead(path);
-            var image = new BitmapImage();
-            image.BeginInit();
-            image.CacheOption = BitmapCacheOption.OnLoad;
-            image.DecodePixelWidth = 320;
-            image.StreamSource = stream;
-            image.EndInit();
-            image.Freeze();
-            return image;
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
-            or ArgumentException or NotSupportedException or FormatException
-            or InvalidOperationException or System.Security.SecurityException)
-        {
-            return null;
-        }
     }
 
     public object ConvertBack(object value, Type targetType, object? parameter, CultureInfo culture) =>
@@ -116,27 +78,6 @@ public sealed class LengthToWidthConverter : IValueConverter
 
         var scale = parameter is string s && double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var p) ? p : 2.5;
         return Math.Clamp(length * scale, 14, 260);
-    }
-
-    public object ConvertBack(object value, Type targetType, object? parameter, CultureInfo culture) =>
-        throw new NotSupportedException();
-}
-
-/// <summary>Colors a signed numeric value: positive = accent (TOP이 큼), negative = warn (BACK이 큼).</summary>
-public sealed class SignToBrushConverter : IValueConverter
-{
-    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-    {
-        var d = value switch
-        {
-            decimal m => (double)m,
-            double dd => dd,
-            _ => 0d
-        };
-
-        if (d > 0) return new SolidColorBrush(Color.FromRgb(0x3D, 0xD6, 0xC6));
-        if (d < 0) return new SolidColorBrush(Color.FromRgb(0xE5, 0xA2, 0x3D));
-        return new SolidColorBrush(Color.FromRgb(0x8B, 0x96, 0xAB));
     }
 
     public object ConvertBack(object value, Type targetType, object? parameter, CultureInfo culture) =>

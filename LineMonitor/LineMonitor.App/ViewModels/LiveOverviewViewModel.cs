@@ -13,7 +13,6 @@ public sealed partial class LiveOverviewViewModel : ObservableObject
 {
     [ObservableProperty] private string _lotId = "-";
     [ObservableProperty] private string _meter = "-";
-    [ObservableProperty] private DateTime _lastUpdated;
 
     [ObservableProperty] private SideMeasurement? _topMeasurement;
     [ObservableProperty] private SideMeasurement? _backMeasurement;
@@ -33,7 +32,6 @@ public sealed partial class LiveOverviewViewModel : ObservableObject
             TopMeasurement = top;
             LotId = top.LotId;
             Meter = top.Meter;
-            LastUpdated = DateTime.Now;
         }
 
         if (back is not null)

@@ -3,7 +3,7 @@ using LineMonitor.Core.Models;
 namespace LineMonitor.Core.Lines;
 
 /// <summary>
-/// Unifies the six differing DB schemas (2동/4동/9동 x 슬리터/코터) behind one query surface.
+/// Provides one query surface for site/process-specific data sources, including mock data.
 /// Each concrete adapter maps its own line's tables/columns into the common models.
 /// </summary>
 public interface ILineAdapter

@@ -53,8 +53,6 @@ public sealed record DefectRecord(
 
 public sealed record CpkResult(int Lane, CpkCategory Category, double? Value);
 
-public sealed record DefectCodeInfo(int Code, string Name, string NameKo);
-
 public sealed record DefectPivotRow(string Location, IReadOnlyDictionary<string, int> CountsByDefectType)
 {
     public string LotId { get; init; } = "-";

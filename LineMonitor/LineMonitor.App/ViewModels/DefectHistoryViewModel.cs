@@ -19,7 +19,6 @@ public sealed partial class DefectHistoryViewModel : ObservableObject
 
     [ObservableProperty] private ObservableCollection<string> _defectTypeColumns = new();
     [ObservableProperty] private string _currentLotId = "-";
-    [ObservableProperty] private int _totalDefectCount;
     [ObservableProperty] private string _topDefectsSummary = "-";
 
     public void Reset()
@@ -27,7 +26,6 @@ public sealed partial class DefectHistoryViewModel : ObservableObject
         _currentAdapter = null;
         _lastSeenId = 0;
         CurrentLotId = "-";
-        TotalDefectCount = 0;
         TopDefectsSummary = "-";
         RecentDefects.Clear();
         PivotRows.Clear();
@@ -92,7 +90,6 @@ public sealed partial class DefectHistoryViewModel : ObservableObject
             RecentDefects.Clear();
             _lastSeenId = 0;
         }
-        TotalDefectCount = pivot.Sum(row => row.Total);
         var topDefects = pivot
             .SelectMany(row => row.CountsByDefectType)
             .GroupBy(pair => pair.Key)
