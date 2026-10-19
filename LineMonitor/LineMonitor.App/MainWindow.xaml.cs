@@ -288,9 +288,9 @@ public partial class MainWindow : Window
             Padding = new Thickness(0),
             FontSize = 15,
             VerticalAlignment = VerticalAlignment.Center,
-            ToolTip = "세로 기본 크기로"
+            ToolTip = "세로 스크롤 없이 내용에 맞춰 최소 높이로"
         };
-        fitHeightButton.Click += (_, _) => ResizeBox(model, card.Width, DefaultCardHeight);
+        fitHeightButton.Click += (_, _) => FitBoxHeight(model);
 
         var closeButton = new Button
         {
@@ -495,6 +495,33 @@ public partial class MainWindow : Window
         var sidebarReserve = _sidebarExpanded ? 0 : _sidebarExpandedWidth + SidebarWidthSplitter.Width;
         return Math.Max(0, BoxesScrollViewer.ViewportWidth - sidebarReserve
             - BoxesPanel.Margin.Left - BoxesPanel.Margin.Right);
+    }
+
+    private void FitBoxHeight(DashboardBoxModel model)
+    {
+        if (model.Card is not FrameworkElement card) return;
+
+        var previousHeight = card.Height;
+        double contentHeight;
+        try
+        {
+            // 가로 폭은 유지하고 내부 스크롤 영역까지 전체 내용의 높이를 측정한다.
+            card.Height = double.NaN;
+            card.Measure(new Size(card.Width, double.PositiveInfinity));
+            contentHeight = Math.Ceiling(card.DesiredSize.Height);
+        }
+        finally
+        {
+            card.Height = previousHeight;
+            card.InvalidateMeasure();
+        }
+
+        ResizeBox(model, card.Width, contentHeight);
+        if (card.Height < contentHeight)
+        {
+            MessageBox.Show(this, "다른 박스와 겹치지 않도록 높이 확장이 제한되었습니다.\n아래쪽 공간을 확보한 뒤 다시 눌러 주세요.",
+                "세로 크기 맞춤", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
     }
 
     private void ResizeBox(DashboardBoxModel model, double width, double height)
