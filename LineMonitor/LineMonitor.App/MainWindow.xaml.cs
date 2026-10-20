@@ -20,7 +20,7 @@ namespace LineMonitor.App;
 /// small hand-rolled replacement styled with our own resources).
 /// Boxes live on a Canvas at their own X/Y — resizing the window never reflows them
 /// (a WrapPanel did that at first and it was explicitly unwanted). Dragging a title bar
-/// moves that one card up to other cards' boundaries; there's no swap-on-drop or auto layout.
+/// moves that one card freely; overlapping boxes are allowed, with no swap-on-drop or auto layout.
 /// The canvas starts empty — the left sidebar lists every box type as a catalog the user
 /// drags (or double-clicks) onto the canvas; already-placed ones show dimmed and can't be
 /// re-added, closing (✕) a card un-dims its row so it can be added back. Position/size/
@@ -28,6 +28,15 @@ namespace LineMonitor.App;
 /// </summary>
 public partial class MainWindow : Window
 {
+    public static readonly DependencyProperty IsLayoutEditableProperty = DependencyProperty.Register(
+        nameof(IsLayoutEditable), typeof(bool), typeof(MainWindow), new PropertyMetadata(true));
+
+    public bool IsLayoutEditable
+    {
+        get => (bool)GetValue(IsLayoutEditableProperty);
+        private set => SetValue(IsLayoutEditableProperty, value);
+    }
+
     private static readonly string LayoutDirectory = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "LineMonitor");
@@ -47,6 +56,7 @@ public partial class MainWindow : Window
     private bool _isHistoryView;
     private readonly List<MainWindow> _childWindows = new();
     private string? _lastSavedLayout;
+    private Rect? _windowBoundsBeforeExpand;
     private Point? _catalogDragStart;
     private DashboardBoxModel? _catalogDragCandidate;
 
@@ -122,8 +132,46 @@ public partial class MainWindow : Window
 
     private void OnCloseClick(object sender, RoutedEventArgs e) => Close();
 
-    private void ToggleMaximize() =>
-        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    private void OnLayoutLockClick(object sender, RoutedEventArgs e)
+    {
+        IsLayoutEditable = !IsLayoutEditable;
+        ClearSelection();
+        _catalogDragStart = null;
+        _catalogDragCandidate = null;
+        CatalogList.IsEnabled = IsLayoutEditable;
+        SizeMatchControls.IsEnabled = IsLayoutEditable;
+        LayoutLockButton.Content = IsLayoutEditable ? "UI 잠금" : "UI 잠금 해제";
+        LayoutLockButton.Background = IsLayoutEditable ? Brushes.Transparent
+            : (Brush)Application.Current.Resources["AccentBrush"];
+        LayoutLockButton.Foreground = IsLayoutEditable
+            ? (Brush)Application.Current.Resources["TextBrush"] : Brushes.White;
+        Debug.Assert(CatalogList.IsEnabled == IsLayoutEditable && SizeMatchControls.IsEnabled == IsLayoutEditable);
+    }
+
+    private void ToggleMaximize()
+    {
+        Rect bounds;
+        if (_windowBoundsBeforeExpand is { } previousBounds)
+        {
+            bounds = previousBounds;
+            _windowBoundsBeforeExpand = null;
+        }
+        else
+        {
+            bounds = Services.WindowPlacement.GetWorkArea(this);
+            _windowBoundsBeforeExpand = WindowState == WindowState.Maximized
+                ? RestoreBounds
+                : new Rect(Left, Top, ActualWidth, ActualHeight);
+        }
+
+        // 실제 최대화 상태에서는 Windows가 이동과 크기 조절을 막으므로 일반 창 크기만 확장한다.
+        WindowState = WindowState.Normal;
+        Left = bounds.Left;
+        Top = bounds.Top;
+        Width = bounds.Width;
+        Height = bounds.Height;
+        Debug.Assert(WindowState == WindowState.Normal && ResizeMode == ResizeMode.CanResize);
+    }
 
     private void OnOpenErrorProofResultsClick(object sender, RoutedEventArgs e)
     {
@@ -326,13 +374,15 @@ public partial class MainWindow : Window
             Cursor = Cursors.SizeAll,
             Child = titleGrid
         };
+        titleBar.SetBinding(IsEnabledProperty, new Binding(nameof(IsLayoutEditable)) { Source = this });
 
-        // 제목바 드래그 = 다른 박스 경계까지 이동(스왑 아님, 다른 박스의 위치는 유지).
+        // 제목바 드래그 = 다른 박스와 겹쳐도 자유롭게 이동.
         // Ctrl+클릭이면 이동 대신 다중 선택 토글(MFC 다이얼로그 에디터처럼) — "크기 맞춤" 버튼들이 이 선택을 씀.
         Point? moveStart = null;
         double moveStartX = 0, moveStartY = 0;
         titleBar.MouseLeftButtonDown += (_, e) =>
         {
+            if (!IsLayoutEditable) return;
             if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
             {
                 ToggleSelection(model);
@@ -404,36 +454,74 @@ public partial class MainWindow : Window
         }
         grip.Child = gripCanvas;
 
-        Point? resizeStart = null;
-        double resizeStartWidth = 0, resizeStartHeight = 0;
-        grip.MouseLeftButtonDown += (_, e) =>
+        void AttachResizeHandle(FrameworkElement handle, int horizontalDirection, int verticalDirection)
         {
-            resizeStart = e.GetPosition(null);
-            resizeStartWidth = card.ActualWidth;
-            resizeStartHeight = card.ActualHeight;
-            grip.CaptureMouse();
-            e.Handled = true;
-        };
-        grip.MouseMove += (_, e) =>
-        {
-            if (resizeStart is not { } start || e.LeftButton != MouseButtonState.Pressed)
+            handle.SetBinding(IsEnabledProperty, new Binding(nameof(IsLayoutEditable)) { Source = this });
+            Point? resizeStart = null;
+            double resizeStartWidth = 0, resizeStartHeight = 0;
+            handle.MouseLeftButtonDown += (_, e) =>
             {
-                return;
-            }
+                if (!IsLayoutEditable) return;
+                resizeStart = e.GetPosition(null);
+                resizeStartWidth = card.Width;
+                resizeStartHeight = card.Height;
+                handle.CaptureMouse();
+                e.Handled = true;
+            };
+            handle.MouseMove += (_, e) =>
+            {
+                if (resizeStart is not { } start || e.LeftButton != MouseButtonState.Pressed) return;
 
-            var pos = e.GetPosition(null);
-            ResizeBox(model, Math.Max(MinCardWidth, resizeStartWidth + (pos.X - start.X)),
-                Math.Max(MinCardHeight, resizeStartHeight + (pos.Y - start.Y)));
-        };
-        grip.MouseLeftButtonUp += (_, _) =>
-        {
-            resizeStart = null;
-            grip.ReleaseMouseCapture();
-        };
+                var pos = e.GetPosition(null);
+                var width = horizontalDirection == 0 ? resizeStartWidth
+                    : Math.Max(MinCardWidth, resizeStartWidth + horizontalDirection * (pos.X - start.X));
+                var height = verticalDirection == 0 ? resizeStartHeight
+                    : Math.Max(MinCardHeight, resizeStartHeight + verticalDirection * (pos.Y - start.Y));
+                ResizeBox(model, width, height, horizontalDirection < 0, verticalDirection < 0);
+            };
+            handle.MouseLeftButtonUp += (_, e) =>
+            {
+                resizeStart = null;
+                handle.ReleaseMouseCapture();
+                e.Handled = true;
+            };
+            handle.LostMouseCapture += (_, _) => resizeStart = null;
+        }
 
         var cardGrid = new Grid();
         cardGrid.Children.Add(body);
+        foreach (var (horizontalDirection, verticalDirection) in new[] { (-1, 0), (1, 0), (0, -1), (0, 1) })
+        {
+            var edge = new Border
+            {
+                Background = Brushes.Transparent,
+                Cursor = horizontalDirection != 0 ? Cursors.SizeWE : Cursors.SizeNS,
+                HorizontalAlignment = horizontalDirection < 0 ? HorizontalAlignment.Left
+                    : horizontalDirection > 0 ? HorizontalAlignment.Right : HorizontalAlignment.Stretch,
+                VerticalAlignment = verticalDirection < 0 ? VerticalAlignment.Top
+                    : verticalDirection > 0 ? VerticalAlignment.Bottom : VerticalAlignment.Stretch,
+                Width = horizontalDirection != 0 ? 6 : double.NaN,
+                Height = verticalDirection != 0 ? 6 : double.NaN,
+                Margin = horizontalDirection != 0 ? new Thickness(0, 6, 0, 6) : new Thickness(6, 0, 6, 0)
+            };
+            AttachResizeHandle(edge, horizontalDirection, verticalDirection);
+            cardGrid.Children.Add(edge);
+        }
+        AttachResizeHandle(grip, 1, 1);
         cardGrid.Children.Add(grip);
+
+        var bottomLeftGrip = new Border
+        {
+            Width = 16,
+            Height = 16,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Background = Brushes.Transparent,
+            Cursor = Cursors.SizeNESW,
+            ToolTip = "드래그해서 가로·세로 크기 조절"
+        };
+        AttachResizeHandle(bottomLeftGrip, -1, 1);
+        cardGrid.Children.Add(bottomLeftGrip);
 
         card = new Border
         {
@@ -449,45 +537,19 @@ public partial class MainWindow : Window
         // 카드 어디를 클릭하든(제목바/본문/그립 상관없이) 맨 앞으로 — 나중에 만든 박스가 항상
         // 위에 있던 문제 수정. PreviewMouseLeftButtonDown은 titleBar/grip의 개별 핸들러보다
         // 먼저 도는 터널링 이벤트라 e.Handled 안 건드리면 기존 드래그/선택 동작에 영향 없음.
-        card.PreviewMouseLeftButtonDown += (_, _) => BringToFront(model);
+        card.PreviewMouseLeftButtonDown += (_, _) =>
+        {
+            if (IsLayoutEditable) BringToFront(model);
+        };
 
         return card;
     }
 
-    private IEnumerable<Rect> OtherBoxBounds(DashboardBoxModel model) =>
-        _visibleBoxes.Where(other => other != model && other.Card is FrameworkElement)
-            .Select(other => new Rect(other.X, other.Y,
-                ((FrameworkElement)other.Card).Width, ((FrameworkElement)other.Card).Height));
-
-    private static bool Overlaps(double start, double length, double otherStart, double otherLength) =>
-        start < otherStart + otherLength && start + length > otherStart;
-
-    private static double ClampMovement(double current, double target, double length, double otherStart, double otherLength)
-    {
-        // 이동 경로의 경계도 검사해 빠르게 드래그해도 다른 박스를 통과하지 않게 한다.
-        if (current + length <= otherStart && target > current)
-            return Math.Min(target, otherStart - length);
-        if (current >= otherStart + otherLength && target < current)
-            return Math.Max(target, otherStart + otherLength);
-        return target;
-    }
-
     private void MoveBox(DashboardBoxModel model, double x, double y)
     {
-        if (model.Card is not FrameworkElement card) return;
-        var obstacles = OtherBoxBounds(model).ToList();
-        foreach (var bounds in obstacles)
-        {
-            if (Overlaps(model.Y, card.Height, bounds.Top, bounds.Height))
-                x = ClampMovement(model.X, x, card.Width, bounds.Left, bounds.Width);
-        }
-        model.X = x;
-        foreach (var bounds in obstacles)
-        {
-            if (Overlaps(model.X, card.Width, bounds.Left, bounds.Width))
-                y = ClampMovement(model.Y, y, card.Height, bounds.Top, bounds.Height);
-        }
-        model.Y = y;
+        if (!IsLayoutEditable || model.Card is not FrameworkElement) return;
+        model.X = Math.Max(0, x);
+        model.Y = Math.Max(0, y);
     }
 
     private double GetMaxCardWidth()
@@ -500,7 +562,7 @@ public partial class MainWindow : Window
 
     private void FitBoxHeight(DashboardBoxModel model)
     {
-        if (model.Card is not FrameworkElement card) return;
+        if (!IsLayoutEditable || model.Card is not FrameworkElement card) return;
 
         var previousHeight = card.Height;
         double contentHeight;
@@ -518,42 +580,34 @@ public partial class MainWindow : Window
         }
 
         ResizeBox(model, card.Width, contentHeight);
-        if (card.Height < contentHeight)
-        {
-            MessageBox.Show(this, "다른 박스와 겹치지 않도록 높이 확장이 제한되었습니다.\n아래쪽 공간을 확보한 뒤 다시 눌러 주세요.",
-                "세로 크기 맞춤", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
     }
 
-    private void ResizeBox(DashboardBoxModel model, double width, double height)
+    private void ResizeBox(DashboardBoxModel model, double width, double height,
+        bool fromLeft = false, bool fromTop = false)
     {
-        if (model.Card is not FrameworkElement card) return;
+        if (!IsLayoutEditable || model.Card is not FrameworkElement card) return;
+        var right = model.X + card.Width;
+        var bottom = model.Y + card.Height;
         if (width > card.Width)
         {
             var maxWidth = GetMaxCardWidth();
             if (maxWidth > 0) width = Math.Min(width, Math.Max(card.Width, maxWidth));
         }
-        var obstacles = OtherBoxBounds(model).ToList();
-        foreach (var bounds in obstacles)
-        {
-            if (width > card.Width && Overlaps(model.Y, card.Height, bounds.Top, bounds.Height))
-                width = ClampMovement(model.X + card.Width, model.X + width, 0,
-                    bounds.Left, bounds.Width) - model.X;
-        }
+        if (fromLeft) width = Math.Min(width, right);
+        if (fromTop) height = Math.Min(height, bottom);
+        if (fromLeft) model.X = right - width;
         card.Width = width;
-        foreach (var bounds in obstacles)
-        {
-            if (height > card.Height && Overlaps(model.X, card.Width, bounds.Left, bounds.Width))
-                height = ClampMovement(model.Y + card.Height, model.Y + height, 0,
-                    bounds.Top, bounds.Height) - model.Y;
-        }
+        if (fromTop) model.Y = bottom - height;
         card.Height = height;
+        Debug.Assert(!fromLeft || Math.Abs(model.X + card.Width - right) < 0.001);
+        Debug.Assert(!fromTop || Math.Abs(model.Y + card.Height - bottom) < 0.001);
     }
 
     private void BringToFront(DashboardBoxModel model) => model.ZIndex = _nextZIndex++;
 
     private void CloseBox(DashboardBoxModel model)
     {
+        if (!IsLayoutEditable) return;
         _visibleBoxes.Remove(model);
         model.IsPlaced = false;
         _selection.Remove(model);
@@ -567,6 +621,7 @@ public partial class MainWindow : Window
 
     private void ToggleSelection(DashboardBoxModel model)
     {
+        if (!IsLayoutEditable) return;
         var previousAnchor = _selectionAnchor;
 
         if (_selection.Contains(model))
@@ -642,6 +697,7 @@ public partial class MainWindow : Window
 
     private void ApplySizeMatch(bool matchWidth, bool matchHeight)
     {
+        if (!IsLayoutEditable) return;
         if (_selectionAnchor is not { } anchor || anchor.Card is not FrameworkElement anchorFe || _selection.Count < 2)
         {
             return;
@@ -656,9 +712,6 @@ public partial class MainWindow : Window
 
             if (matchWidth)
             {
-                // 먼저 필요한 만큼 줄여 정렬에 불필요한 충돌이 생기지 않게 한다.
-                ResizeBox(model, Math.Min(fe.Width, anchorFe.ActualWidth),
-                    matchHeight ? Math.Min(fe.Height, anchorFe.ActualHeight) : fe.Height);
                 MoveBox(model, anchor.X, model.Y);
             }
 
@@ -669,6 +722,7 @@ public partial class MainWindow : Window
 
     private void OnCatalogItemMouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
+        if (!IsLayoutEditable) return;
         if (CatalogList.SelectedItem is not DashboardBoxModel model || model.IsPlaced)
         {
             return;
@@ -681,6 +735,7 @@ public partial class MainWindow : Window
 
     private void OnCatalogRowPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if (!IsLayoutEditable) return;
         if (((FrameworkElement)sender).DataContext is not DashboardBoxModel { IsPlaced: false } model)
         {
             return;
@@ -692,6 +747,7 @@ public partial class MainWindow : Window
 
     private void OnCatalogRowPreviewMouseMove(object sender, MouseEventArgs e)
     {
+        if (!IsLayoutEditable) return;
         if (e.LeftButton != MouseButtonState.Pressed || _catalogDragCandidate is not { } model || _catalogDragStart is not { } start)
         {
             return;
@@ -709,12 +765,14 @@ public partial class MainWindow : Window
 
     private void OnCanvasDragOver(object sender, DragEventArgs e)
     {
-        e.Effects = e.Data.GetDataPresent(typeof(DashboardBoxModel)) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Effects = IsLayoutEditable && e.Data.GetDataPresent(typeof(DashboardBoxModel))
+            ? DragDropEffects.Copy : DragDropEffects.None;
         e.Handled = true;
     }
 
     private void OnCanvasDrop(object sender, DragEventArgs e)
     {
+        if (!IsLayoutEditable) return;
         if (e.Data.GetData(typeof(DashboardBoxModel)) is not DashboardBoxModel model || model.IsPlaced)
         {
             return;

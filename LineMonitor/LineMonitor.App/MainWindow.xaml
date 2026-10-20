@@ -122,6 +122,8 @@
                             Style="{StaticResource LayoutPresetTab}" Click="OnHistoryInquiryClick" />
                     <Button x:Name="NewWindowButton" Content="새 창" Style="{StaticResource LayoutPresetTab}"
                             Click="OnNewWindowClick" ToolTip="현재 화면을 별도 작업창으로 엽니다." />
+                    <Button x:Name="LayoutLockButton" Content="UI 잠금" Style="{StaticResource LayoutPresetTab}"
+                            Click="OnLayoutLockClick" ToolTip="박스 이동·크기 변경·추가·삭제를 잠급니다." />
                 </StackPanel>
 
                 <!-- Ctrl+클릭으로 박스 여러 개 고른 뒤 마지막으로 고른 박스 크기에 맞춤(MFC "동일하게" 기능) -->
