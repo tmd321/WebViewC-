@@ -23,6 +23,7 @@ artifacts/
 
 # Publish output
 publish/
+/LineMonitor/실행파일/
 
 ### Windows
 # Windows thumbnail cache files
