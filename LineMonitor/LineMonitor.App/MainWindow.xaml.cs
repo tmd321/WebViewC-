@@ -37,6 +37,15 @@ public partial class MainWindow : Window
         private set => SetValue(IsLayoutEditableProperty, value);
     }
 
+    public static readonly DependencyProperty IsMeasurementMirroredProperty = DependencyProperty.Register(
+        nameof(IsMeasurementMirrored), typeof(bool), typeof(MainWindow), new PropertyMetadata(false));
+
+    public bool IsMeasurementMirrored
+    {
+        get => (bool)GetValue(IsMeasurementMirroredProperty);
+        private set => SetValue(IsMeasurementMirroredProperty, value);
+    }
+
     private static readonly string LayoutDirectory = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "LineMonitor");
@@ -59,6 +68,7 @@ public partial class MainWindow : Window
     private Rect? _windowBoundsBeforeExpand;
     private Point? _catalogDragStart;
     private DashboardBoxModel? _catalogDragCandidate;
+    private Point? _selectionDragStart;
 
     private readonly HashSet<DashboardBoxModel> _selection = new();
     private DashboardBoxModel? _selectionAnchor;
@@ -126,6 +136,87 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnBoxesSelectionMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (!IsLayoutEditable || _isHistoryView) return;
+        for (var current = e.OriginalSource as DependencyObject; current is not null;
+             current = current is Visual ? VisualTreeHelper.GetParent(current) : LogicalTreeHelper.GetParent(current))
+        {
+            if (current is System.Windows.Controls.Primitives.ScrollBar
+                || _visibleBoxes.Any(box => ReferenceEquals(box.Card, current))) return;
+            if (ReferenceEquals(current, BoxesScrollViewer)) break;
+        }
+
+        ClearSelection();
+        if (!BoxesScrollViewer.CaptureMouse()) return;
+        _selectionDragStart = e.GetPosition(BoxesPanel);
+        e.Handled = true;
+    }
+
+    private void OnBoxesSelectionMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_selectionDragStart is null) return;
+        if (!IsLayoutEditable || e.LeftButton != MouseButtonState.Pressed)
+        {
+            EndBoxSelection();
+            return;
+        }
+        UpdateBoxSelection(e.GetPosition(BoxesPanel));
+        e.Handled = true;
+    }
+
+    private void OnBoxesSelectionMouseUp(object sender, MouseButtonEventArgs e)
+    {
+        if (_selectionDragStart is null) return;
+        if (IsLayoutEditable) UpdateBoxSelection(e.GetPosition(BoxesPanel));
+        EndBoxSelection();
+        e.Handled = true;
+    }
+
+    private void OnBoxesSelectionLostMouseCapture(object sender, MouseEventArgs e)
+    {
+        if (_selectionDragStart is not null && !BoxesScrollViewer.IsMouseCaptured) EndBoxSelection();
+    }
+
+    private void UpdateBoxSelection(Point end)
+    {
+        if (_selectionDragStart is not { } start) return;
+        if (SelectionRectangle.Visibility != Visibility.Visible
+            && Math.Abs(end.X - start.X) < SystemParameters.MinimumHorizontalDragDistance
+            && Math.Abs(end.Y - start.Y) < SystemParameters.MinimumVerticalDragDistance) return;
+
+        // 박스 좌표와 같은 스크롤 콘텐츠 좌표로 판정하고, 사각형만 화면 위에 그린다.
+        var bounds = new Rect(start, end);
+        var overlayPosition = BoxesPanel.TranslatePoint(bounds.TopLeft, SelectionOverlay);
+        Canvas.SetLeft(SelectionRectangle, overlayPosition.X);
+        Canvas.SetTop(SelectionRectangle, overlayPosition.Y);
+        SelectionRectangle.Width = bounds.Width;
+        SelectionRectangle.Height = bounds.Height;
+        SelectionRectangle.Visibility = Visibility.Visible;
+
+        _selection.Clear();
+        foreach (var model in _visibleBoxes)
+        {
+            if (model.Card is FrameworkElement card && card.ActualWidth > 0 && card.ActualHeight > 0
+                && bounds.IntersectsWith(new Rect(model.X, model.Y, card.ActualWidth, card.ActualHeight)))
+            {
+                _selection.Add(model);
+            }
+        }
+        _selectionAnchor = _visibleBoxes.LastOrDefault(model => _selection.Contains(model));
+        foreach (var model in _visibleBoxes) RefreshSelectionVisual(model);
+        UpdateSizeMatchButtonsEnabled();
+        Debug.Assert(_selection.All(model => model.Card is FrameworkElement card
+            && bounds.IntersectsWith(new Rect(model.X, model.Y, card.ActualWidth, card.ActualHeight))));
+    }
+
+    private void EndBoxSelection()
+    {
+        _selectionDragStart = null;
+        SelectionRectangle.Visibility = Visibility.Collapsed;
+        if (BoxesScrollViewer.IsMouseCaptured) BoxesScrollViewer.ReleaseMouseCapture();
+    }
+
     private void OnMinimizeClick(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
 
     private void OnMaximizeClick(object sender, RoutedEventArgs e) => ToggleMaximize();
@@ -134,6 +225,7 @@ public partial class MainWindow : Window
 
     private void OnLayoutLockClick(object sender, RoutedEventArgs e)
     {
+        EndBoxSelection();
         IsLayoutEditable = !IsLayoutEditable;
         ClearSelection();
         _catalogDragStart = null;
@@ -146,6 +238,12 @@ public partial class MainWindow : Window
         LayoutLockButton.Foreground = IsLayoutEditable
             ? (Brush)Application.Current.Resources["TextBrush"] : Brushes.White;
         Debug.Assert(CatalogList.IsEnabled == IsLayoutEditable && SizeMatchControls.IsEnabled == IsLayoutEditable);
+    }
+
+    private void OnMirrorMeasurementsClick(object sender, RoutedEventArgs e)
+    {
+        if (!IsLayoutEditable) return;
+        IsMeasurementMirrored = !IsMeasurementMirrored;
     }
 
     private void ToggleMaximize()
@@ -259,18 +357,22 @@ public partial class MainWindow : Window
         RestoreSavedLayout(vm);
     }
 
-    private static FrameworkElement BindControl(FrameworkElement control, object source, string path)
+    private FrameworkElement BindControl(FrameworkElement control, object source, string path)
     {
         if (control is Controls.SidePanel sidePanel)
         {
             sidePanel.SetBinding(Controls.SidePanel.ShowInsulationProperty,
                 new Binding(nameof(MainViewModel.ShowInsulation)) { Source = source });
+            sidePanel.SetBinding(Controls.SidePanel.IsMirroredProperty,
+                new Binding(nameof(IsMeasurementMirrored)) { Source = this });
         }
 
         if (control is Controls.MismatchPanel mismatchPanel)
         {
             mismatchPanel.SetBinding(Controls.MismatchPanel.IsCathodeElectrodeProperty,
                 new Binding(nameof(MainViewModel.ShowInsulation)) { Source = source });
+            mismatchPanel.SetBinding(Controls.MismatchPanel.IsMirroredProperty,
+                new Binding(nameof(IsMeasurementMirrored)) { Source = this });
         }
 
         control.SetBinding(DataContextProperty, new Binding(path) { Source = source });
@@ -376,10 +478,10 @@ public partial class MainWindow : Window
         };
         titleBar.SetBinding(IsEnabledProperty, new Binding(nameof(IsLayoutEditable)) { Source = this });
 
-        // 제목바 드래그 = 다른 박스와 겹쳐도 자유롭게 이동.
+        // 제목바 드래그 = 선택된 박스들을 같은 이동량으로 함께 이동.
         // Ctrl+클릭이면 이동 대신 다중 선택 토글(MFC 다이얼로그 에디터처럼) — "크기 맞춤" 버튼들이 이 선택을 씀.
         Point? moveStart = null;
-        double moveStartX = 0, moveStartY = 0;
+        var moveStartPositions = new Dictionary<DashboardBoxModel, Point>();
         titleBar.MouseLeftButtonDown += (_, e) =>
         {
             if (!IsLayoutEditable) return;
@@ -396,26 +498,47 @@ public partial class MainWindow : Window
             }
 
             moveStart = e.GetPosition(null);
-            moveStartX = model.X;
-            moveStartY = model.Y;
-            titleBar.CaptureMouse();
+            moveStartPositions.Clear();
+            foreach (var box in _selection.Count > 0 ? _selection.ToList() : new List<DashboardBoxModel> { model })
+            {
+                moveStartPositions.Add(box, new Point(box.X, box.Y));
+            }
+            if (!titleBar.CaptureMouse())
+            {
+                moveStart = null;
+                moveStartPositions.Clear();
+            }
             e.Handled = true;
         };
         titleBar.MouseMove += (_, e) =>
         {
-            if (moveStart is not { } start || e.LeftButton != MouseButtonState.Pressed)
+            if (!IsLayoutEditable || moveStart is not { } start
+                || moveStartPositions.Count == 0 || e.LeftButton != MouseButtonState.Pressed)
             {
                 return;
             }
 
             var pos = e.GetPosition(null);
-            MoveBox(model, Math.Max(0, moveStartX + (pos.X - start.X)),
-                Math.Max(0, moveStartY + (pos.Y - start.Y)));
+            // 그룹 전체에 같은 경계 제한을 적용해 왼쪽·위쪽 끝에서도 상대 위치를 유지한다.
+            var deltaX = Math.Max(pos.X - start.X, -moveStartPositions.Values.Min(point => point.X));
+            var deltaY = Math.Max(pos.Y - start.Y, -moveStartPositions.Values.Min(point => point.Y));
+            foreach (var (box, position) in moveStartPositions)
+            {
+                MoveBox(box, position.X + deltaX, position.Y + deltaY);
+                Debug.Assert(Math.Abs(box.X - position.X - deltaX) < 0.001
+                    && Math.Abs(box.Y - position.Y - deltaY) < 0.001);
+            }
         };
         titleBar.MouseLeftButtonUp += (_, _) =>
         {
             moveStart = null;
+            moveStartPositions.Clear();
             titleBar.ReleaseMouseCapture();
+        };
+        titleBar.LostMouseCapture += (_, _) =>
+        {
+            moveStart = null;
+            moveStartPositions.Clear();
         };
 
         var scroller = new ScrollViewer
@@ -917,6 +1040,8 @@ public partial class MainWindow : Window
 
     private void ResetLayout()
     {
+        EndBoxSelection();
+        IsMeasurementMirrored = false;
         ClearSelection();
         _visibleBoxes.Clear();
         _nextZIndex = 1;
@@ -954,6 +1079,8 @@ public partial class MainWindow : Window
             {
                 return;
             }
+
+            IsMeasurementMirrored = state.IsMeasurementMirrored;
 
             // 기본값은 "전부 안 놓임" — 저장돼있던 Visible 목록에 있는 것만 캔버스에 되돌려놓음.
             foreach (var id in state.Visible)
@@ -1024,6 +1151,7 @@ public partial class MainWindow : Window
 
     private LayoutState CaptureLayoutState() => new()
     {
+        IsMeasurementMirrored = IsMeasurementMirrored,
         Visible = _allBoxes.Where(b => b.IsPlaced).Select(b => b.Id).ToList(),
         X = _allBoxes.ToDictionary(b => b.Id, b => b.X),
         Y = _allBoxes.ToDictionary(b => b.Id, b => b.Y),
@@ -1115,6 +1243,7 @@ public partial class MainWindow : Window
 
     private sealed class LayoutState
     {
+        public bool IsMeasurementMirrored { get; set; }
         public List<string> Visible { get; set; } = new();
         public Dictionary<string, double> X { get; set; } = new();
         public Dictionary<string, double> Y { get; set; } = new();

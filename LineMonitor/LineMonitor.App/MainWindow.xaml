@@ -229,7 +229,24 @@
             <Border Grid.Column="1" x:Name="SidebarContent" Background="{StaticResource SidebarBgBrush}">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Margin="14,16,14,10">
-                        <TextBlock Text="박스 목록" FontSize="17" FontWeight="SemiBold" />
+                        <Button Click="OnMirrorMeasurementsClick" Margin="-10,0,0,12" Padding="10,6"
+                                HorizontalAlignment="Left"
+                                IsEnabled="{Binding IsLayoutEditable, RelativeSource={RelativeSource AncestorType=Window}}"
+                                ToolTip="TOP·BACK 측정과 Wet·Dry 미스매치의 레인 및 좌우 값을 함께 반전합니다.">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource LayoutPresetTab}">
+                                    <Setter Property="Content" Value="좌우 반전: 꺼짐" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsMeasurementMirrored, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                            <Setter Property="Content" Value="좌우 반전: 켜짐" />
+                                            <Setter Property="Background" Value="#DCEBFF" />
+                                            <Setter Property="Foreground" Value="#17365D" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                        <TextBlock Text="목록" FontSize="17" FontWeight="SemiBold" />
                         <TextBlock Text="작업 영역으로 드래그하거나 더블클릭해서 추가" Style="{StaticResource MutedText}" Margin="0,2,0,0" />
                     </StackPanel>
                     <ListBox x:Name="CatalogList" Margin="4,0,4,4" BorderThickness="0" Background="Transparent"
@@ -264,8 +281,13 @@
             <Grid Grid.Column="3">
                 <ScrollViewer x:Name="BoxesScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                               HorizontalContentAlignment="Stretch"
+                              Background="Transparent"
+                              PreviewMouseLeftButtonDown="OnBoxesSelectionMouseDown"
+                              MouseMove="OnBoxesSelectionMouseMove"
+                              MouseLeftButtonUp="OnBoxesSelectionMouseUp"
+                              LostMouseCapture="OnBoxesSelectionLostMouseCapture"
                               AllowDrop="True" DragOver="OnCanvasDragOver" Drop="OnCanvasDrop">
-                    <ItemsControl x:Name="BoxesPanel" Margin="8" Grid.IsSharedSizeScope="True"
+                    <ItemsControl x:Name="BoxesPanel" Margin="8" Grid.IsSharedSizeScope="True" Background="Transparent"
                                   ItemsPanel="{StaticResource DashboardBoxesPanel}">
                         <ItemsControl.ItemContainerStyle>
                             <Style TargetType="ContentPresenter">
@@ -281,6 +303,12 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </ScrollViewer>
+
+                <Canvas x:Name="SelectionOverlay" IsHitTestVisible="False" ClipToBounds="True">
+                    <Rectangle x:Name="SelectionRectangle" Visibility="Collapsed"
+                               Stroke="{StaticResource AccentBrush}" StrokeThickness="1"
+                               Fill="#303B82F6" />
+                </Canvas>
 
                 <!-- 빈 작업 영역 안내 문구 — 박스가 하나라도 놓이면 코드비하인드에서 Collapsed 처리 -->
                 <TextBlock x:Name="EmptyCanvasHint" Text="여기에 박스를 드래그하세요"
