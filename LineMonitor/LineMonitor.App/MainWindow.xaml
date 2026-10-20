@@ -65,7 +65,7 @@
         </Style>
     </Window.Resources>
 
-    <DockPanel>
+    <DockPanel Grid.IsSharedSizeScope="True">
         <!-- 커스텀 타이틀바: 어두운 회색 바탕 + 흰 글씨, 창 기본 크롬 대신 직접 그림 -->
         <Border DockPanel.Dock="Top" Background="#2B2F36" Height="36" MouseLeftButtonDown="OnTitleBarMouseLeftButtonDown">
             <Grid>
@@ -94,8 +94,8 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="ErrorProofColumn" />
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="ToolbarBrandColumn" />
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="LineSelectionText" Text="{Binding SelectionDisplayName}" FontSize="18" FontWeight="SemiBold"
                            VerticalAlignment="Center" HorizontalAlignment="Left" Margin="0"
@@ -145,20 +145,25 @@
                             <TextBlock Text="결과 바로가기" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Button>
-                    <Button Content="에러프루프 시작" Style="{StaticResource ErrorProofButton}"
+                    <Button x:Name="ErrorProofStartButton" Content="에러프루프 시작" Style="{StaticResource ErrorProofButton}"
                             Click="OnStartErrorProofClick" ToolTip="현재 선택한 DB에 에러프루프 시작 신호를 전송합니다." />
                 </StackPanel>
 
-                <Image x:Name="ToolbarLogo" Grid.Column="3" Source="/Assets/logo.png" Height="28" VerticalAlignment="Center" Margin="0" />
+                <StackPanel x:Name="ToolbarBrand" Grid.Column="3" VerticalAlignment="Center">
+                    <Image x:Name="ToolbarLogo" Source="/Assets/logo.png" Height="28" Margin="0" />
+                    <TextBlock Text="ver 1.0" FontSize="12" HorizontalAlignment="Center" Margin="0,3,0,0"
+                               Foreground="{StaticResource TextBrush}" />
+                </StackPanel>
             </Grid>
         </Border>
 
-        <Border x:Name="MainSummaryBar" DockPanel.Dock="Top" Background="{StaticResource BgBrush}" Padding="8,0,8,4">
+        <Border x:Name="MainSummaryBar" DockPanel.Dock="Top" Background="{StaticResource BgBrush}" Padding="12,0,12,4">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="200" />
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="200" />
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="ErrorProofColumn" />
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="ToolbarBrandColumn" />
                 </Grid.ColumnDefinitions>
             <WrapPanel Grid.Column="1" HorizontalAlignment="Center">
                 <Border Style="{StaticResource CardBorder}" MinWidth="200">
@@ -180,8 +185,9 @@
                                Style="{StaticResource ValueText}" TextWrapping="Wrap" />
                 </Border>
             </WrapPanel>
-                <Border Grid.Column="2" Margin="8,4,4,4" Padding="12,8" CornerRadius="4"
-                        VerticalAlignment="Center"
+                <Border Grid.Column="2" Margin="0,4,16,4" Padding="12,8" CornerRadius="4"
+                        Width="{Binding ActualWidth, ElementName=ErrorProofStartButton}"
+                        HorizontalAlignment="Right" VerticalAlignment="Center"
                         ToolTip="DB 서버 응답 상태입니다. 설비·PLC의 운전 상태와는 다릅니다.">
                     <Border.Style>
                         <Style TargetType="Border">

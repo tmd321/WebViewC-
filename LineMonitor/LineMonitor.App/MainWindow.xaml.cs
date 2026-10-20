@@ -90,7 +90,7 @@ public partial class MainWindow : Window
             LineSelectionText.Visibility = Visibility.Collapsed;
             LiveControls.Visibility = Visibility.Collapsed;
             ErrorProofControls.Visibility = Visibility.Collapsed;
-            ToolbarLogo.Visibility = Visibility.Collapsed;
+            ToolbarBrand.Visibility = Visibility.Collapsed;
             NavigationControls.Margin = new Thickness(0);
         }
         UpdateViewState();
