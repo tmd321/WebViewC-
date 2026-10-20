@@ -169,7 +169,7 @@ public sealed class MockLineAdapter : ILineAdapter
         return Task.FromResult<IReadOnlyList<CpkResult>>(results);
     }
 
-    public Task<IReadOnlyList<DefectRecord>> GetRecentDefectsAsync(int take, long sinceId = 0, CancellationToken ct = default)
+    public Task<IReadOnlyList<DefectRecord>> GetRecentDefectsAsync(string lotId, int take, long sinceId = 0, CancellationToken ct = default)
     {
         var now = DateTime.Now;
 
@@ -177,7 +177,7 @@ public sealed class MockLineAdapter : ILineAdapter
         {
             // 초기 로드: take개를 그 자리에서 즉시 생성(내림차순 — 최신이 앞)
             var initial = Enumerable.Range(0, take)
-                .Select(i => BuildDefect(_nextDefectId++, now.AddSeconds(-30 * i)))
+                .Select(i => BuildDefect(_nextDefectId++, now.AddSeconds(-30 * i), lotId))
                 .ToList();
             return Task.FromResult<IReadOnlyList<DefectRecord>>(initial);
         }
@@ -185,19 +185,19 @@ public sealed class MockLineAdapter : ILineAdapter
         // 증분 폴링: 매 tick마다 0~2건 정도 새로 "발생"한 걸로 시뮬레이션(오름차순)
         var newCount = _rng.Next(0, 3);
         var records = Enumerable.Range(0, newCount)
-            .Select(_ => BuildDefect(_nextDefectId++, now))
+            .Select(_ => BuildDefect(_nextDefectId++, now, lotId))
             .ToList();
 
         return Task.FromResult<IReadOnlyList<DefectRecord>>(records);
     }
 
-    private DefectRecord BuildDefect(long id, DateTime time)
+    private DefectRecord BuildDefect(long id, DateTime time, string lotId)
     {
         var defectName = DefectTypeNames[_rng.Next(DefectTypeNames.Length)];
         return new DefectRecord(
             Id: id,
             Time: time,
-            LotId: "YCF" + _rng.Next(10000, 99999),
+            LotId: lotId,
             Lane: _rng.Next(1, Profile.LaneCount + 1),
             DefectCode: (100 + _rng.Next(0, 35)).ToString(),
             DefectName: defectName,
@@ -208,7 +208,7 @@ public sealed class MockLineAdapter : ILineAdapter
             SizeY: Jitter(0.01m, 0.09m));
     }
 
-    public Task<IReadOnlyList<DefectPivotRow>> GetDefectPivotAsync(CancellationToken ct = default)
+    public Task<IReadOnlyList<DefectPivotRow>> GetDefectPivotAsync(string lotId, CancellationToken ct = default)
     {
         var rows = Locations
             .Select(location =>
@@ -222,7 +222,7 @@ public sealed class MockLineAdapter : ILineAdapter
                     counts[type] = counts.GetValueOrDefault(type) + _rng.Next(1, 3);
                 }
 
-                return new DefectPivotRow(location, counts);
+                return new DefectPivotRow(location, counts) { LotId = lotId };
             })
             .ToList();
 

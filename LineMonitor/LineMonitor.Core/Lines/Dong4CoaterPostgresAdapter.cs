@@ -298,7 +298,7 @@ public sealed class Dong4CoaterPostgresAdapter : ILineAdapter
         return results;
     }
 
-    public async Task<IReadOnlyList<DefectRecord>> GetRecentDefectsAsync(int take, long sinceId = 0, CancellationToken ct = default)
+    public async Task<IReadOnlyList<DefectRecord>> GetRecentDefectsAsync(string lotId, int take, long sinceId = 0, CancellationToken ct = default)
     {
         // sinceId=0: 초기 로드(최신부터 내림차순). sinceId>0: 그 id 이후만 오름차순 —
         // 워터마크 기반 증분 폴링이라 폴링 틱 사이에 여러 건 쌓여도 안 놓침.
@@ -308,7 +308,7 @@ public sealed class Dong4CoaterPostgresAdapter : ILineAdapter
                        n.pos_x, n.pos_y, n.size_x, n.size_y
                 from public.ng n
                 left join public.defect_code d on d.defect_type_code = n.defect_type_code
-                where n.id > @sinceId
+                where n.lot_id = @lotId and n.id > @sinceId
                 order by n.id asc
                 limit @take
                 """
@@ -317,6 +317,7 @@ public sealed class Dong4CoaterPostgresAdapter : ILineAdapter
                        n.pos_x, n.pos_y, n.size_x, n.size_y
                 from public.ng n
                 left join public.defect_code d on d.defect_type_code = n.defect_type_code
+                where n.lot_id = @lotId
                 order by n.id desc
                 limit @take
                 """;
@@ -325,6 +326,7 @@ public sealed class Dong4CoaterPostgresAdapter : ILineAdapter
         await conn.OpenAsync(ct);
         await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("take", take);
+        cmd.Parameters.AddWithValue("lotId", lotId);
         if (sinceId > 0)
         {
             cmd.Parameters.AddWithValue("sinceId", sinceId);
@@ -352,19 +354,20 @@ public sealed class Dong4CoaterPostgresAdapter : ILineAdapter
         return records;
     }
 
-    public async Task<IReadOnlyList<DefectPivotRow>> GetDefectPivotAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<DefectPivotRow>> GetDefectPivotAsync(string lotId, CancellationToken ct = default)
     {
         const string sql = """
             select d.defect_name, count(*) as cnt
             from public.ng n
             left join public.defect_code d on d.defect_type_code = n.defect_type_code
-            where n.defect_time > (now() - interval '1 day')::text
+            where n.lot_id = @lotId
             group by d.defect_name
             """;
 
         await using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync(ct);
         await using var cmd = new NpgsqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("lotId", lotId);
         await using var reader = await cmd.ExecuteReaderAsync(ct);
 
         var counts = new Dictionary<string, int>();
@@ -376,7 +379,7 @@ public sealed class Dong4CoaterPostgresAdapter : ILineAdapter
 
         // ng 테이블엔 개소(위치) 구분 컬럼이 없어 전체를 한 행으로 집계함 —
         // 위치별 분리가 필요하면 top_back/cam_num 컬럼 기준으로 확장.
-        return new[] { new DefectPivotRow("전체", counts) };
+        return new[] { new DefectPivotRow("전체", counts) { LotId = lotId } };
     }
 
     private static decimal? ReadDecimal(NpgsqlDataReader reader, string column)

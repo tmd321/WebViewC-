@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using LineMonitor.Core.Lines;
 using LineMonitor.Core.Models;
@@ -32,29 +33,25 @@ public sealed partial class DefectHistoryViewModel : ObservableObject
         DefectTypeColumns = new ObservableCollection<string>();
     }
 
-    public async Task RefreshAsync(ILineAdapter adapter, CancellationToken ct = default)
+    public async Task RefreshAsync(ILineAdapter adapter, string lotId, CancellationToken ct = default)
     {
-        // 같은 공정에서도 극성/접속 DB가 달라지면 이전 ID를 재사용하지 않는다.
-        if (!ReferenceEquals(_currentAdapter, adapter))
+        // 불량이 없는 새 LOT에서도 이전 집계를 즉시 지우고 ID 조회 기준을 초기화한다.
+        if (!ReferenceEquals(_currentAdapter, adapter) || CurrentLotId != lotId)
         {
             Reset();
             _currentAdapter = adapter;
+            CurrentLotId = lotId;
+            Debug.Assert(_lastSeenId == 0 && RecentDefects.Count == 0
+                && PivotRows.Count == 0 && TopDefectsSummary == "-");
         }
+        if (string.IsNullOrWhiteSpace(lotId) || lotId == "-") return;
 
         var defects = await adapter.GetRecentDefectsAsync(
-            _lastSeenId == 0 ? InitialLoadTake : MaxRecentDefects, _lastSeenId, ct);
-        if (!ReferenceEquals(_currentAdapter, adapter)) return;
+            lotId, _lastSeenId == 0 ? InitialLoadTake : MaxRecentDefects, _lastSeenId, ct);
+        if (!ReferenceEquals(_currentAdapter, adapter) || CurrentLotId != lotId) return;
 
         if (defects.Count > 0)
         {
-            var lotId = defects.MaxBy(defect => defect.Id)!.LotId;
-            if (CurrentLotId != lotId)
-            {
-                CurrentLotId = lotId;
-                RecentDefects.Clear();
-                _lastSeenId = 0;
-            }
-
             if (_lastSeenId == 0)
             {
                 // 초기 로드: 어댑터가 이미 최신순(내림차순)으로 줌 — 그대로 채움.
@@ -81,15 +78,9 @@ public sealed partial class DefectHistoryViewModel : ObservableObject
             _lastSeenId = defects.Max(d => d.Id);
         }
 
-        var pivot = await adapter.GetDefectPivotAsync(ct);
-        if (!ReferenceEquals(_currentAdapter, adapter)) return;
-        var pivotLotId = pivot.FirstOrDefault()?.LotId;
-        if (pivotLotId is not null and not "-" && pivotLotId != CurrentLotId)
-        {
-            CurrentLotId = pivotLotId;
-            RecentDefects.Clear();
-            _lastSeenId = 0;
-        }
+        var pivot = await adapter.GetDefectPivotAsync(lotId, ct);
+        if (!ReferenceEquals(_currentAdapter, adapter) || CurrentLotId != lotId) return;
+        Debug.Assert(defects.All(defect => defect.LotId == lotId) && pivot.All(row => row.LotId == lotId));
         var topDefects = pivot
             .SelectMany(row => row.CountsByDefectType)
             .GroupBy(pair => pair.Key)

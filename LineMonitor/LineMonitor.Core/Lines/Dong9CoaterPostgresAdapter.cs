@@ -490,25 +490,18 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
         return new RecipeSpec(nullWidth, coatWidth, insulLsl, insulUsl, mismatchLsl, mismatchUsl);
     }
 
-    public async Task<IReadOnlyList<DefectRecord>> GetRecentDefectsAsync(int take, long sinceId = 0, CancellationToken ct = default)
+    public async Task<IReadOnlyList<DefectRecord>> GetRecentDefectsAsync(string lotId, int take, long sinceId = 0, CancellationToken ct = default)
     {
         var order = sinceId > 0 ? "asc" : "desc";
         var sql = $"""
-            with latest_lot as (
-                select coalesce(
-                    (select lot_id from public.frame where nullif(trim(lot_id), '') is not null order by id desc limit 1),
-                    (select lot_id from public.ng where nullif(trim(lot_id), '') is not null order by id desc limit 1)
-                ) as lot_id
-            )
             select n.id, n.defect_time, n.lot_id, n.lane, n.pc_index, n.defect_type_code,
                    coalesce(d.defect_type_name, '') as defect_type_name,
                    coalesce(nullif(to_jsonb(d)->>'defect_type_name_ko', ''), nullif(d.defect_type_name, ''),
                             '코드 ' || n.defect_type_code::text, '미분류') as defect_type_name_ko,
                    n.pos_x, n.pos_y, n.pos_full_x, n.pos_full_y, n.size_x, n.size_y, n.defect_name
             from public.ng n
-            join latest_lot l on l.lot_id = n.lot_id
             left join public.defect_code d on d.defect_type_code = n.defect_type_code
-            where n.id > @sinceId
+            where n.lot_id = @lotId and n.id > @sinceId
             order by n.id {order}
             limit @take
             """;
@@ -518,6 +511,7 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
         await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("take", take);
         cmd.Parameters.AddWithValue("sinceId", sinceId);
+        cmd.Parameters.AddWithValue("lotId", lotId);
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
 
@@ -550,20 +544,17 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
         return records;
     }
 
-    public async Task<IReadOnlyList<DefectPivotRow>> GetDefectPivotAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<DefectPivotRow>> GetDefectPivotAsync(string lotId, CancellationToken ct = default)
     {
         const string sql = """
-            with latest_lot as (
-                select coalesce(
-                    (select lot_id from public.frame where nullif(trim(lot_id), '') is not null order by id desc limit 1),
-                    (select lot_id from public.ng where nullif(trim(lot_id), '') is not null order by id desc limit 1)
-                ) as lot_id
+            with current_lot as (
+                select @lotId::text as lot_id
             )
             select l.lot_id, n.pc_index,
                    coalesce(nullif(to_jsonb(d)->>'defect_type_name_ko', ''), nullif(d.defect_type_name, ''),
                             '코드 ' || n.defect_type_code::text, '미분류') as defect_type_name,
                    count(n.id) as cnt
-            from latest_lot l
+            from current_lot l
             left join public.ng n on n.lot_id = l.lot_id
             left join public.defect_code d on d.defect_type_code = n.defect_type_code
             group by 1, 2, 3;
@@ -577,14 +568,13 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
         await using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync(ct);
         await using var cmd = new NpgsqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("lotId", lotId);
         await using var reader = await cmd.ExecuteReaderAsync(ct);
 
         var countsByLocation = new[] { 0, 2, 3, 4 }
             .ToDictionary(pcIndex => DefectLocationFor(pcIndex), _ => new Dictionary<string, int>());
-        var lotId = "-";
         while (await reader.ReadAsync(ct))
         {
-            lotId = reader.IsDBNull(0) ? "-" : reader.GetString(0);
             var count = checked((int)reader.GetInt64(3));
             if (count == 0) continue;
             var pcIndex = reader.IsDBNull(1) ? (int?)null : reader.GetInt32(1);

@@ -124,7 +124,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             if (!IsLive) return;
             await LiveOverview.RefreshAsync(adapter);
             if (!ReferenceEquals(adapter, _adapter)) return;
-            await DefectHistory.RefreshAsync(adapter);
+            await DefectHistory.RefreshAsync(adapter, LiveOverview.LotId);
             if (!ReferenceEquals(adapter, _adapter)) return;
             await TrendCpk.RefreshAsync(adapter);
         }
