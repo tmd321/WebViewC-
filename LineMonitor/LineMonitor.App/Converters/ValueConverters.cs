@@ -1,10 +1,45 @@
 using System.Globalization;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
 using LineMonitor.Core.Models;
 
 namespace LineMonitor.App.Converters;
+
+/// <summary>표시용 데이터만 반전하고 DB의 레인 번호와 좌우 값은 변경하지 않는다.</summary>
+public sealed class MirrorMeasurementConverter : IMultiValueConverter
+{
+    public object? Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (values.Length < 2 || values[1] is not true) return values.FirstOrDefault();
+        if (values[0] is SideMeasurement measurement)
+        {
+            var mirrored = measurement with
+            {
+                Edges = measurement.Edges.Reverse().ToList(),
+                Lanes = measurement.Lanes.Reverse().Select(lane => lane with
+                {
+                    InsulWetLeft = lane.InsulWetRight,
+                    InsulWetRight = lane.InsulWetLeft,
+                    InsulDryLeft = lane.InsulDryRight,
+                    InsulDryRight = lane.InsulDryLeft
+                }).ToList()
+            };
+            Debug.Assert(mirrored.Lanes.Select(lane => lane.Lane)
+                .SequenceEqual(measurement.Lanes.Select(lane => lane.Lane).Reverse()));
+            return mirrored;
+        }
+        if (values[0] is IEnumerable<LaneMismatch> lanes)
+        {
+            return lanes.Reverse().Select(lane => lane with { Left = lane.Right, Right = lane.Left }).ToList();
+        }
+        return values[0];
+    }
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
 
 /// <summary>Visible when the bound value is non-null (a string is also "null" when empty). Pass ConverterParameter="Invert" to flip.</summary>
 public sealed class NullToVisibilityConverter : IValueConverter

@@ -5,6 +5,7 @@
              xmlns:conv="clr-namespace:LineMonitor.App.Converters"
              x:Name="Root">
     <UserControl.Resources>
+        <conv:MirrorMeasurementConverter x:Key="MirrorMeasurement" />
         <conv:MismatchBarMarginConverter x:Key="MismatchBarMargin" />
         <Style x:Key="MaterialStrip" TargetType="Border">
             <Setter Property="Background" Value="#C0C0C0" />
@@ -19,8 +20,26 @@
     </UserControl.Resources>
 
     <Border Style="{StaticResource PanelBorder}">
+        <Border.DataContext>
+            <MultiBinding Converter="{StaticResource MirrorMeasurement}" Mode="OneWay">
+                <Binding Path="DataContext" ElementName="Root" />
+                <Binding Path="IsMirrored" ElementName="Root" />
+                <!-- 반전한 목록도 실시간 컬렉션의 Clear/Add마다 다시 만든다. -->
+                <Binding Path="DataContext.Count" ElementName="Root" />
+            </MultiBinding>
+        </Border.DataContext>
         <StackPanel>
             <Grid Margin="0,0,0,6">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="FlowDirection" Value="LeftToRight" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsMirrored, ElementName=Root}" Value="True">
+                                <Setter Property="FlowDirection" Value="RightToLeft" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -31,7 +50,7 @@
                     <TextBlock Text="{Binding LeftLabel, ElementName=Root}" FontWeight="Bold" Foreground="White" FontSize="18" />
                 </Border>
 
-                <StackPanel Grid.Column="1" HorizontalAlignment="Center" Orientation="Horizontal">
+                <StackPanel Grid.Column="1" HorizontalAlignment="Center" Orientation="Horizontal" FlowDirection="LeftToRight">
                     <TextBlock Text="{Binding Title, ElementName=Root}" FontWeight="Bold" FontSize="18"
                                Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" />
                     <Border Background="#218653" CornerRadius="4" Padding="8,3">

@@ -6,6 +6,7 @@
              xmlns:controls="clr-namespace:LineMonitor.App.Controls"
              x:Name="Root" UseLayoutRounding="True" SnapsToDevicePixels="True">
     <UserControl.Resources>
+        <conv:MirrorMeasurementConverter x:Key="MirrorMeasurement" />
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
         <conv:NullToVisibilityConverter x:Key="NullToVis" />
         <conv:CollectionHasItemsConverter x:Key="HasItems" />
@@ -33,9 +34,25 @@
     </UserControl.Resources>
 
     <Border Style="{StaticResource PanelBorder}">
+        <Border.DataContext>
+            <MultiBinding Converter="{StaticResource MirrorMeasurement}" Mode="OneWay">
+                <Binding Path="DataContext" ElementName="Root" />
+                <Binding Path="IsMirrored" ElementName="Root" />
+            </MultiBinding>
+        </Border.DataContext>
         <StackPanel>
             <!-- DS Lane1 ... TOP/BACK ... LaneN OS -->
             <Grid Margin="0,0,0,6">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="FlowDirection" Value="LeftToRight" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsMirrored, ElementName=Root}" Value="True">
+                                <Setter Property="FlowDirection" Value="RightToLeft" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -47,17 +64,18 @@
                         <TextBlock Text="DS" FontWeight="Bold" Foreground="White" FontSize="18" />
                     </Border>
                     <Border Background="Black" Padding="6,2" CornerRadius="3">
-                        <TextBlock Text="Lane 1" FontWeight="Bold" Foreground="White" FontSize="18" />
+                        <TextBlock Text="Lane 1" FlowDirection="LeftToRight" FontWeight="Bold" Foreground="White" FontSize="18" />
                     </Border>
                 </StackPanel>
 
                 <TextBlock Grid.Column="1" Text="{Binding Title, ElementName=Root}"
+                           FlowDirection="LeftToRight"
                            FontSize="24" FontWeight="Bold" HorizontalAlignment="Center"
                            Foreground="{StaticResource AccentBrush}" />
 
                 <StackPanel Orientation="Horizontal" Grid.Column="2" HorizontalAlignment="Right">
                     <Border Background="Black" Padding="6,2" CornerRadius="3" Margin="0,0,6,0">
-                        <TextBlock Text="{Binding Lanes.Count, StringFormat='Lane {0}'}" FontWeight="Bold" Foreground="White" FontSize="18" />
+                        <TextBlock Text="{Binding Lanes.Count, StringFormat='Lane {0}'}" FlowDirection="LeftToRight" FontWeight="Bold" Foreground="White" FontSize="18" />
                     </Border>
                     <Border Background="Black" Padding="6,2" CornerRadius="3">
                         <TextBlock Text="OS" FontWeight="Bold" Foreground="White" FontSize="18" />

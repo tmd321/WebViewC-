@@ -12,6 +12,15 @@ public partial class SidePanel : UserControl
     public static readonly DependencyProperty ShowInsulationProperty =
         DependencyProperty.Register(nameof(ShowInsulation), typeof(bool), typeof(SidePanel), new PropertyMetadata(true));
 
+    public static readonly DependencyProperty IsMirroredProperty =
+        DependencyProperty.Register(nameof(IsMirrored), typeof(bool), typeof(SidePanel), new PropertyMetadata(false));
+
+    public bool IsMirrored
+    {
+        get => (bool)GetValue(IsMirroredProperty);
+        set => SetValue(IsMirroredProperty, value);
+    }
+
     public bool ShowInsulation
     {
         get => (bool)GetValue(ShowInsulationProperty);

@@ -18,6 +18,15 @@ public partial class MismatchPanel : UserControl
     public static readonly DependencyProperty IsCathodeElectrodeProperty =
         DependencyProperty.Register(nameof(IsCathodeElectrode), typeof(bool), typeof(MismatchPanel), new PropertyMetadata(true));
 
+    public static readonly DependencyProperty IsMirroredProperty =
+        DependencyProperty.Register(nameof(IsMirrored), typeof(bool), typeof(MismatchPanel), new PropertyMetadata(false));
+
+    public bool IsMirrored
+    {
+        get => (bool)GetValue(IsMirroredProperty);
+        set => SetValue(IsMirroredProperty, value);
+    }
+
     public bool IsCathodeElectrode
     {
         get => (bool)GetValue(IsCathodeElectrodeProperty);
