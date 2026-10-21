@@ -135,6 +135,9 @@
                             Margin="0,0,4,0" IsEnabled="False" Click="OnMatchHeightClick" ToolTip="마지막으로 고른 박스 세로에 맞춤" />
                     <Button x:Name="MatchBothButton" Content="가로+세로" Style="{StaticResource PillButton}" Padding="10,4"
                             IsEnabled="False" Click="OnMatchBothClick" ToolTip="기준 박스의 크기와 왼쪽 위치에 맞춤" />
+                    <Button x:Name="AutoArrangeButton" Content="자동정렬" Style="{StaticResource PillButton}" Padding="10,4"
+                            Margin="4,0,0,0" IsEnabled="False" Click="OnAutoArrangeClick"
+                            ToolTip="선택한 박스를 최대 너비와 세로 기본크기로 맞추고 위에서부터 빈틈없이 정렬합니다." />
                 </StackPanel>
 
                 <StackPanel x:Name="ErrorProofControls" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">

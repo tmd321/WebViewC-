@@ -104,7 +104,8 @@ public partial class MainWindow : Window
             // 크기 맞춤 버튼은 현재 선택을 사용하므로 해제하지 않는다.
             if (ReferenceEquals(current, MatchWidthButton)
                 || ReferenceEquals(current, MatchHeightButton)
-                || ReferenceEquals(current, MatchBothButton)) return;
+                || ReferenceEquals(current, MatchBothButton)
+                || ReferenceEquals(current, AutoArrangeButton)) return;
         }
 
         ClearSelection();
@@ -847,6 +848,7 @@ public partial class MainWindow : Window
         MatchWidthButton.IsEnabled = enabled;
         MatchHeightButton.IsEnabled = enabled;
         MatchBothButton.IsEnabled = enabled;
+        AutoArrangeButton.IsEnabled = IsLayoutEditable && _selection.Count > 0;
     }
 
     private void OnMatchWidthClick(object sender, RoutedEventArgs e) => ApplySizeMatch(matchWidth: true, matchHeight: false);
@@ -854,6 +856,41 @@ public partial class MainWindow : Window
     private void OnMatchHeightClick(object sender, RoutedEventArgs e) => ApplySizeMatch(matchWidth: false, matchHeight: true);
 
     private void OnMatchBothClick(object sender, RoutedEventArgs e) => ApplySizeMatch(matchWidth: true, matchHeight: true);
+
+    private void OnAutoArrangeClick(object sender, RoutedEventArgs e)
+    {
+        if (!IsLayoutEditable || _isHistoryView || _selection.Count == 0) return;
+        var boxes = _visibleBoxes.Where(box => _selection.Contains(box) && box.Card is FrameworkElement)
+            .OrderBy(box => box.Y).ThenBy(box => box.X).ToList();
+        if (boxes.Count == 0) return;
+
+        BoxesScrollViewer.UpdateLayout();
+        var width = GetMaxCardWidth();
+        if (width <= 0) return;
+
+        foreach (var box in boxes)
+        {
+            ResizeBox(box, width, ((FrameworkElement)box.Card!).Height);
+        }
+        BoxesScrollViewer.UpdateLayout();
+
+        var y = 0d;
+        foreach (var box in boxes)
+        {
+            var card = (FrameworkElement)box.Card!;
+            MoveBox(box, 0, y);
+            FitBoxHeight(box);
+            Debug.Assert(box.X == 0 && Math.Abs(card.Width - width) < 0.001 && box.Y == y);
+            // 제목줄은 박스 위에 겹쳐 표시되므로 높이와 간격에 포함하지 않는다.
+            y += card.Height;
+        }
+
+        Debug.Assert(boxes.Zip(boxes.Skip(1), (above, below) =>
+            Math.Abs(above.Y + ((FrameworkElement)above.Card!).Height - below.Y) < 0.001).All(touching => touching));
+        BoxesScrollViewer.ScrollToLeftEnd();
+        BoxesScrollViewer.ScrollToTop();
+        if (DataContext is MainViewModel viewModel) SaveLayout(viewModel);
+    }
 
     private void ApplySizeMatch(bool matchWidth, bool matchHeight)
     {
