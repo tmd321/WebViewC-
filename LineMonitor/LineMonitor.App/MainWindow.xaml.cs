@@ -56,6 +56,8 @@ public partial class MainWindow : Window
     private readonly bool _isSecondaryWindow;
     private bool _isHistoryView;
     private readonly List<MainWindow> _childWindows = new();
+    private ErrorProofWindow? _errorProofProgressWindow;
+    private ErrorProofViewModel? _errorProofViewModel;
     private string? _lastSavedLayout;
     private Rect? _windowBoundsBeforeExpand;
     private Point? _catalogDragStart;
@@ -90,6 +92,14 @@ public partial class MainWindow : Window
             EmptyCanvasHint.Visibility = _visibleBoxes.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         Loaded += OnLoaded;
         Closing += OnClosing;
+        Closed += (_, _) =>
+        {
+            if (_errorProofViewModel is null) return;
+            _errorProofViewModel.PropertyChanged -= OnErrorProofPropertyChanged;
+            _errorProofViewModel.ResultsReady -= OnErrorProofResultsReady;
+            CloseErrorProofProgress();
+            _errorProofViewModel.Dispose();
+        };
         PreviewMouseDown += OnWindowPreviewMouseDown;
     }
 
@@ -327,6 +337,13 @@ public partial class MainWindow : Window
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         var vm = (MainViewModel)DataContext;
+        if (!_isSecondaryWindow && _errorProofViewModel is null)
+        {
+            _errorProofViewModel = vm.ErrorProof;
+            _errorProofViewModel.PropertyChanged += OnErrorProofPropertyChanged;
+            _errorProofViewModel.ResultsReady += OnErrorProofResultsReady;
+            UpdateErrorProofProgress();
+        }
 
         _allBoxes.Add(CreateBox("TopMeasurement", "TOP 측정",
             BindControl(new Controls.SidePanel { Title = "TOP" }, vm, "LiveOverview.TopMeasurement")));
@@ -1197,6 +1214,36 @@ public partial class MainWindow : Window
         {
             _lastSavedLayout = JsonSerializer.Serialize(CaptureLayoutState());
         }
+    }
+
+    private void OnErrorProofPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ErrorProofViewModel.IsRunning)) UpdateErrorProofProgress();
+    }
+
+    private void UpdateErrorProofProgress()
+    {
+        if (_errorProofViewModel?.IsRunning == true)
+        {
+            if (_errorProofProgressWindow is not null) return;
+            _errorProofProgressWindow = new ErrorProofWindow { Owner = this };
+            _errorProofProgressWindow.Show();
+        }
+        else CloseErrorProofProgress();
+    }
+
+    private void CloseErrorProofProgress()
+    {
+        _errorProofProgressWindow?.CloseProgress();
+        _errorProofProgressWindow = null;
+    }
+
+    private void OnErrorProofResultsReady(string lotId,
+        IReadOnlyList<LineMonitor.Core.Models.ErrorProofResult> results, string? error)
+    {
+        var window = ErrorProofWindow.CreateResults(lotId, results, error);
+        window.Owner = this;
+        window.Show();
     }
 
     private void OnClosing(object? sender, CancelEventArgs e)

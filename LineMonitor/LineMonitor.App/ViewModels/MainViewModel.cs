@@ -51,6 +51,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public LiveOverviewViewModel LiveOverview { get; } = new();
     public DefectHistoryViewModel DefectHistory { get; } = new();
     public TrendCpkViewModel TrendCpk { get; } = new();
+    public ErrorProofViewModel ErrorProof { get; } = new();
 
     public MainViewModel(
         LineAdapterFactory factory,
@@ -77,6 +78,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public void SelectLine(LineId lineId, ElectrodeType electrodeType)
     {
+        ErrorProof.Reset();
         SelectedLine = Lines.First(line => line.LineId == lineId);
         SelectedElectrode = electrodeType;
         TrendCpk.ShowInsulation = ShowInsulation;
@@ -121,9 +123,21 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 if (!connected) return;
             }
 
-            if (!IsLive) return;
+            if (!IsLive)
+            {
+                // Live 표시를 멈춰도 에러프루프 종료 감지는 계속한다.
+                if (adapter is Dong9CoaterPostgresAdapter coater)
+                {
+                    var frame = await coater.GetLatestFrameAsync(Side.Top);
+                    if (ReferenceEquals(adapter, _adapter) && frame is not null)
+                        ErrorProof.ObserveLot(coater, frame.LotId);
+                }
+                return;
+            }
             await LiveOverview.RefreshAsync(adapter);
             if (!ReferenceEquals(adapter, _adapter)) return;
+            if (adapter is Dong9CoaterPostgresAdapter liveCoater)
+                ErrorProof.ObserveLot(liveCoater, LiveOverview.LotId);
             await DefectHistory.RefreshAsync(adapter, LiveOverview.LotId);
             if (!ReferenceEquals(adapter, _adapter)) return;
             await TrendCpk.RefreshAsync(adapter);
@@ -141,5 +155,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void ToggleLive() => IsLive = !IsLive;
 
-    public void Dispose() => _timer.Stop();
+    public void Dispose()
+    {
+        _timer.Stop();
+        ErrorProof.Dispose();
+    }
 }

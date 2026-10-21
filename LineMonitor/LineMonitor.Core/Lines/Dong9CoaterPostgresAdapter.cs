@@ -52,6 +52,54 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
         return await cmd.ExecuteNonQueryAsync(ct);
     }
 
+    public async Task<IReadOnlyList<ErrorProofResult>> GetErrorProofResultsAsync(string lotId, CancellationToken ct = default)
+    {
+        const string sql = """
+            with expected as (
+                select e.defect_code, v.pc_index, max(v.quantity) as quantity
+                from public.error_proofing e
+                cross join lateral (values (0, e.th), (1, e."to"), (2, e.bh),
+                                           (3, e.bot), (4, e.bob)) v(pc_index, quantity)
+                group by e.defect_code, v.pc_index
+            ), detected as (
+                select defect_type_code as defect_code, pc_index, count(*) as quantity
+                from public.ng where lot_id = @lotId
+                group by defect_type_code, pc_index
+            ), names as (
+                select defect_type_code,
+                       max(nullif(to_jsonb(d)->>'defect_type_name_ko', '')) as ko,
+                       max(nullif(d.defect_type_name, '')) as en
+                from public.defect_code d group by defect_type_code
+            )
+            select coalesce(e.defect_code, n.defect_code) as code,
+                   coalesce(e.pc_index, n.pc_index) as pc_index,
+                   coalesce(n.quantity, 0) as detected, e.quantity as expected, d.ko, d.en
+            from expected e full join detected n
+                on e.defect_code = n.defect_code and e.pc_index = n.pc_index
+            left join names d on d.defect_type_code = coalesce(e.defect_code, n.defect_code)
+            where coalesce(e.pc_index, n.pc_index) in (0, 2, 3, 4)
+            order by code, pc_index
+            """;
+        await using var conn = new NpgsqlConnection(_connectionString);
+        await conn.OpenAsync(ct);
+        await using var cmd = new NpgsqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("lotId", lotId);
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        var results = new List<ErrorProofResult>();
+        while (await reader.ReadAsync(ct))
+        {
+            int? defectCode = reader.IsDBNull(0) ? null : reader.GetInt32(0);
+            var code = defectCode is null ? "미분류" : $"코드 {defectCode}";
+            var ko = reader.IsDBNull(4) ? null : reader.GetString(4);
+            var en = reader.IsDBNull(5) ? null : reader.GetString(5);
+            var name = ko is not null && en is not null && ko != en ? $"{ko}({en})" : ko ?? en ?? code;
+            var pcIndex = reader.IsDBNull(1) ? -1 : reader.GetInt32(1);
+            results.Add(new ErrorProofResult(defectCode, pcIndex, name, reader.GetInt64(2),
+                reader.IsDBNull(3) ? null : reader.GetInt32(3)));
+        }
+        return results;
+    }
+
     private static int FramePcIndexFor(Side side, Stage stage) => (side, stage) switch
     {
         (Side.Top, Stage.Wet) => 0,
