@@ -118,6 +118,11 @@ public partial class MainWindow : Window
             Debug.Assert(_selection.Count == 0);
             e.Handled = true;
         }
+        else if (e.Key == Key.Escape && Keyboard.Modifiers == ModifierKeys.None && _selection.Count > 0)
+        {
+            ClearSelection();
+            e.Handled = true;
+        }
     }
 
     private void OnWindowPreviewMouseDown(object sender, MouseButtonEventArgs e)
