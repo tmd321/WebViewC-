@@ -6,7 +6,12 @@ public sealed record LaneReading(int Lane, decimal? Tolerance, decimal? Insul, d
     public decimal? InsulRight { get; init; }
 }
 
-public sealed record LaneMismatch(int Lane, decimal? Left, decimal? Right);
+public sealed record LaneMismatch(int Lane, decimal? Left, decimal? Right)
+{
+    public MeasurementRange? Spec { get; init; }
+    public bool IsLeftOutOfSpec => Spec?.IsOutOfRange(Left) == true;
+    public bool IsRightOutOfSpec => Spec?.IsOutOfRange(Right) == true;
+}
 
 public sealed record FrameSnapshot(
     string LotId,
@@ -75,7 +80,13 @@ public sealed record DefectPivotRow(string Location, IReadOnlyDictionary<string,
 // 레인 자체의 Wet/Dry 누적값을 별도 스트립으로 보여준다.
 
 /// <summary>레인 사이 간격(에지) 지점 하나. 3/4 Lane Cut처럼 tolerance 대신 컷폭 라벨이 뜨는 지점도 있음.</summary>
-public sealed record EdgeReading(int GapIndex, decimal? Wet, decimal? Dry, string? CutLabel);
+public sealed record EdgeReading(int GapIndex, decimal? Wet, decimal? Dry, string? CutLabel)
+{
+    public MeasurementRange? WetSpec { get; init; }
+    public MeasurementRange? DrySpec { get; init; }
+    public bool IsWetOutOfSpec => WetSpec?.IsOutOfRange(Wet) == true;
+    public bool IsDryOutOfSpec => DrySpec?.IsOutOfRange(Dry) == true;
+}
 
 /// <summary>레인 셀 하나: Wet/Dry 누적값 + 절연 좌/우 Wet/Dry.</summary>
 public sealed record LaneWetDry(
@@ -89,6 +100,18 @@ public sealed record LaneWetDry(
 {
     public string? CutLabel { get; init; }
     public decimal? CutWidth { get; init; }
+    public MeasurementRange? WetCoatSpec { get; init; }
+    public MeasurementRange? DryCoatSpec { get; init; }
+    public MeasurementRange? WetInsulSpec { get; init; }
+    public MeasurementRange? DryInsulSpec { get; init; }
+    public MeasurementRange? CutSpec { get; init; }
+    public bool IsWetOutOfSpec => WetCoatSpec?.IsOutOfRange(Wet) == true;
+    public bool IsDryOutOfSpec => DryCoatSpec?.IsOutOfRange(Dry) == true;
+    public bool IsInsulWetLeftOutOfSpec => WetInsulSpec?.IsOutOfRange(InsulWetLeft) == true;
+    public bool IsInsulWetRightOutOfSpec => WetInsulSpec?.IsOutOfRange(InsulWetRight) == true;
+    public bool IsInsulDryLeftOutOfSpec => DryInsulSpec?.IsOutOfRange(InsulDryLeft) == true;
+    public bool IsInsulDryRightOutOfSpec => DryInsulSpec?.IsOutOfRange(InsulDryRight) == true;
+    public bool IsCutWidthOutOfSpec => CutSpec?.IsOutOfRange(CutWidth) == true;
 }
 
 /// <summary>

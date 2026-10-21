@@ -276,7 +276,7 @@
                               MouseLeftButtonUp="OnBoxesSelectionMouseUp"
                               LostMouseCapture="OnBoxesSelectionLostMouseCapture"
                               AllowDrop="True" DragOver="OnCanvasDragOver" Drop="OnCanvasDrop">
-                    <ItemsControl x:Name="BoxesPanel" Margin="8" Grid.IsSharedSizeScope="True" Background="Transparent"
+                    <ItemsControl x:Name="BoxesPanel" Margin="8,40,8,8" Grid.IsSharedSizeScope="True" Background="Transparent"
                                   ItemsPanel="{StaticResource DashboardBoxesPanel}">
                         <ItemsControl.ItemContainerStyle>
                             <Style TargetType="ContentPresenter">

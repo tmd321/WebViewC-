@@ -172,11 +172,18 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
                 ReadDecimal(reader, $"lane_{lane}_r_mismatch")));
         }
 
+        var lotId = reader.GetString(reader.GetOrdinal("lot_id"));
+        var grabTime = ParseGrapTime(reader, "grap_time");
+        // 풀 크기가 1이어도 스펙 조회가 대기하지 않도록 측정 조회 연결을 먼저 반환한다.
+        await reader.CloseAsync();
+        await conn.CloseAsync();
+        var spec = await GetLatestRecipeSpecAsync(ct, lotId);
+        var mismatchSpec = new MeasurementRange(spec.MismatchLsl, spec.MismatchUsl);
         return new MismatchSnapshot(
-            reader.GetString(reader.GetOrdinal("lot_id")),
+            lotId,
             Side.Back,
-            lanes,
-            ParseGrapTime(reader, "grap_time"));
+            lanes.Select(lane => lane with { Spec = mismatchSpec }).ToList(),
+            grabTime);
     }
 
     public async Task<SideMeasurement?> GetSideMeasurementAsync(Side side, CancellationToken ct = default)
@@ -192,13 +199,23 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
         var dryByLane = dryFrame?.Lanes.ToDictionary(lane => lane.Lane) ?? new Dictionary<int, LaneReading>();
         var displayFrame = dryFrame ?? wetFrame!;
         var laneCount = Math.Clamp(displayFrame.LaneCount ?? 8, 1, 8);
+        var spec = await GetLatestRecipeSpecAsync(ct, displayFrame.LotId);
+        // LOT 전환 중 Wet/Dry가 서로 다른 LOT이면 각 측정값의 LOT 스펙을 사용한다.
+        var wetSpec = wetFrame is not null && wetFrame.LotId != displayFrame.LotId
+            ? await GetLatestRecipeSpecAsync(ct, wetFrame.LotId) : spec;
+        var wetInsulSpec = new MeasurementRange(wetSpec.InsulLsl, wetSpec.InsulUsl);
+        var dryInsulSpec = new MeasurementRange(spec.InsulLsl, spec.InsulUsl);
 
         var edges = Enumerable.Range(1, laneCount + 1)
             .Select(lane => new EdgeReading(
                 lane,
                 Wet: wetByLane.GetValueOrDefault(lane)?.Tolerance,
                 Dry: dryByLane.GetValueOrDefault(lane)?.Tolerance,
-                CutLabel: null))
+                CutLabel: null)
+            {
+                WetSpec = wetSpec.NullWidthRange(lane),
+                DrySpec = spec.NullWidthRange(lane)
+            })
             .ToList();
 
         var lanes = Enumerable.Range(1, laneCount)
@@ -209,7 +226,13 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
                 InsulWetLeft: wetByLane.GetValueOrDefault(lane)?.InsulLeft,
                 InsulWetRight: wetByLane.GetValueOrDefault(lane)?.InsulRight,
                 InsulDryLeft: dryByLane.GetValueOrDefault(lane)?.InsulLeft,
-                InsulDryRight: dryByLane.GetValueOrDefault(lane)?.InsulRight))
+                InsulDryRight: dryByLane.GetValueOrDefault(lane)?.InsulRight)
+            {
+                WetCoatSpec = wetSpec.CoatWidthRange(lane),
+                DryCoatSpec = spec.CoatWidthRange(lane),
+                WetInsulSpec = wetInsulSpec,
+                DryInsulSpec = dryInsulSpec
+            })
             .ToList();
 
         if (side == Side.Back && laneCount is >= 6 and <= 8)
@@ -220,12 +243,14 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
             lanes[dsLane - 1] = lanes[dsLane - 1] with
             {
                 CutLabel = $"{dsLane} Lane Cut",
-                CutWidth = cuttingWidths.GetValueOrDefault(1)
+                CutWidth = cuttingWidths.GetValueOrDefault(1),
+                CutSpec = spec.CuttingWidthByLane.GetValueOrDefault(dsLane)
             };
             lanes[osLane - 1] = lanes[osLane - 1] with
             {
                 CutLabel = $"{osLane} Lane Cut",
-                CutWidth = cuttingWidths.GetValueOrDefault(0)
+                CutWidth = cuttingWidths.GetValueOrDefault(0),
+                CutSpec = spec.CuttingWidthByLane.GetValueOrDefault(osLane)
             };
         }
 
@@ -420,25 +445,33 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
         decimal? MismatchLsl,
         decimal? MismatchUsl)
     {
-        public (decimal?, decimal?) NullWidthRange(int lane) =>
-            NullWidthByLane.TryGetValue(lane, out var r) ? r : (null, null);
+        public Dictionary<int, MeasurementRange> CuttingWidthByLane { get; init; } = new();
 
-        public (decimal?, decimal?) CoatWidthRange(int lane) =>
-            CoatWidthByLane.TryGetValue(lane, out var r) ? r : (null, null);
+        public MeasurementRange NullWidthRange(int lane) =>
+            NullWidthByLane.TryGetValue(lane, out var r) ? new(r.Lsl, r.Usl) : new(null, null);
+
+        public MeasurementRange CoatWidthRange(int lane) =>
+            CoatWidthByLane.TryGetValue(lane, out var r) ? new(r.Lsl, r.Usl) : new(null, null);
     }
 
-    private async Task<RecipeSpec> GetLatestRecipeSpecAsync(CancellationToken ct)
+    private async Task<RecipeSpec> GetLatestRecipeSpecAsync(CancellationToken ct, string? lotId = null)
     {
         var nullWidth = new Dictionary<int, (decimal?, decimal?)>();
         var coatWidth = new Dictionary<int, (decimal?, decimal?)>();
+        var cuttingWidth = new Dictionary<int, MeasurementRange>();
         decimal? mismatchLsl = null;
         decimal? mismatchUsl = null;
 
         var nullCols = string.Join(",", Enumerable.Range(1, 9).SelectMany(l => new[] { $"min_null_width_lane_{l}", $"max_null_width_lane_{l}" }));
         var coatCols = string.Join(",", Enumerable.Range(1, 8).SelectMany(l => new[] { $"min_coat_width_lane_{l}", $"max_coat_width_lane_{l}" }));
         var recipeSql = $"""
-            select {nullCols}, {coatCols}, mismatch_data_min, mismatch_data_max
-            from public.recipe
+            select {nullCols}, {coatCols}, mismatch_data_min, mismatch_data_max,
+                   to_jsonb(r)->>'cutting_width_4_min' as cutting_width_4_min,
+                   to_jsonb(r)->>'cutting_width_4_max' as cutting_width_4_max,
+                   to_jsonb(r)->>'cutting_width_5_min' as cutting_width_5_min,
+                   to_jsonb(r)->>'cutting_width_5_max' as cutting_width_5_max
+            from public.recipe r
+            where (@lotId::text is null or r.lot_id = @lotId)
             order by id desc
             limit 1
             """;
@@ -447,6 +480,7 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
         {
             await conn.OpenAsync(ct);
             await using var cmd = new NpgsqlCommand(recipeSql, conn);
+            cmd.Parameters.AddWithValue("lotId", NpgsqlTypes.NpgsqlDbType.Text, (object?)lotId ?? DBNull.Value);
             await using var reader = await cmd.ExecuteReaderAsync(ct);
             if (await reader.ReadAsync(ct))
             {
@@ -462,6 +496,11 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
 
                 mismatchLsl = ReadDecimal(reader, "mismatch_data_min");
                 mismatchUsl = ReadDecimal(reader, "mismatch_data_max");
+                foreach (var lane in new[] { 4, 5 })
+                {
+                    cuttingWidth[lane] = new MeasurementRange(ReadDecimal(reader, $"cutting_width_{lane}_min"),
+                        ReadDecimal(reader, $"cutting_width_{lane}_max"));
+                }
             }
         }
 
@@ -470,6 +509,7 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
         const string insulSql = """
             select min_insul_width, max_insul_width
             from public.recipe_insul
+            where (@lotId::text is null or lot_id = @lotId)
             order by id desc
             limit 1
             """;
@@ -479,6 +519,7 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
             await using var conn = new NpgsqlConnection(_connectionString);
             await conn.OpenAsync(ct);
             await using var cmd = new NpgsqlCommand(insulSql, conn);
+            cmd.Parameters.AddWithValue("lotId", NpgsqlTypes.NpgsqlDbType.Text, (object?)lotId ?? DBNull.Value);
             await using var reader = await cmd.ExecuteReaderAsync(ct);
             if (await reader.ReadAsync(ct))
             {
@@ -487,7 +528,10 @@ public sealed class Dong9CoaterPostgresAdapter : ILineAdapter
             }
         }
 
-        return new RecipeSpec(nullWidth, coatWidth, insulLsl, insulUsl, mismatchLsl, mismatchUsl);
+        return new RecipeSpec(nullWidth, coatWidth, insulLsl, insulUsl, mismatchLsl, mismatchUsl)
+        {
+            CuttingWidthByLane = cuttingWidth
+        };
     }
 
     public async Task<IReadOnlyList<DefectRecord>> GetRecentDefectsAsync(string lotId, int take, long sinceId = 0, CancellationToken ct = default)

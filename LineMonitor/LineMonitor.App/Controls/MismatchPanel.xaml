@@ -5,6 +5,7 @@
              xmlns:conv="clr-namespace:LineMonitor.App.Converters"
              x:Name="Root">
     <UserControl.Resources>
+        <conv:OutOfSpecBrushConverter x:Key="SpecBrush" />
         <conv:MirrorMeasurementConverter x:Key="MirrorMeasurement" />
         <conv:MismatchBarMarginConverter x:Key="MismatchBarMargin" />
         <Style x:Key="MaterialStrip" TargetType="Border">
@@ -19,7 +20,7 @@
         </Style>
     </UserControl.Resources>
 
-    <Border Style="{StaticResource PanelBorder}">
+    <Border Style="{StaticResource PanelBorder}" Padding="12,3">
         <Border.DataContext>
             <MultiBinding Converter="{StaticResource MirrorMeasurement}" Mode="OneWay">
                 <Binding Path="DataContext" ElementName="Root" />
@@ -29,7 +30,7 @@
             </MultiBinding>
         </Border.DataContext>
         <StackPanel>
-            <Grid x:Name="MeasurementTitleArea" Margin="0,0,0,6" Background="Transparent"
+            <Grid x:Name="MeasurementTitleArea" Margin="0,0,0,2" Background="Transparent"
                   ToolTip="더블클릭해서 이 미스매치 화면의 좌우 방향을 반전합니다.">
                 <Grid.Style>
                     <Style TargetType="Grid">
@@ -69,7 +70,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" SharedSizeGroup="LaneStripLabels" />
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="110" />
+                    <ColumnDefinition Width="Auto" MinWidth="110" SharedSizeGroup="LaneStripAverage" />
                 </Grid.ColumnDefinitions>
                 <Grid Width="50" Height="32" VerticalAlignment="Top" Margin="0,2,6,0">
                     <Grid.RowDefinitions>
@@ -87,8 +88,8 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="{x:Type vm:LaneMismatch}">
-                        <StackPanel Margin="0,2">
-                            <Grid Height="32" Margin="0,0,0,4">
+                        <StackPanel>
+                            <Grid Height="32" Margin="0,0,0,2">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="*" />
                                     <RowDefinition Height="*" />
@@ -101,12 +102,12 @@
                             </Grid>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <TextBlock Text="{Binding Left, StringFormat='{}{0:0.00}', TargetNullValue=-}"
-                                           FontWeight="Bold" FontSize="20"
-                                           Foreground="Black" Margin="0,0,4,0" />
+                                           FontWeight="Bold" FontSize="22"
+                                           Foreground="{Binding IsLeftOutOfSpec, Converter={StaticResource SpecBrush}, ConverterParameter={x:Static Brushes.Black}}" Margin="0,0,4,0" />
                                 <TextBlock Text="|" Style="{StaticResource MutedText}" Foreground="Black" Margin="0,0,4,0" />
                                 <TextBlock Text="{Binding Right, StringFormat='{}{0:0.00}', TargetNullValue=-}"
-                                           FontWeight="Bold" FontSize="20"
-                                           Foreground="Black" />
+                                           FontWeight="Bold" FontSize="22"
+                                           Foreground="{Binding IsRightOutOfSpec, Converter={StaticResource SpecBrush}, ConverterParameter={x:Static Brushes.Black}}" />
                             </StackPanel>
                         </StackPanel>
                     </DataTemplate>

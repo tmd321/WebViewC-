@@ -45,7 +45,7 @@ public partial class MainWindow : Window
     private const double DefaultCardWidth = 480;
     private const double DefaultCardHeight = 420;
     private const double MinCardWidth = 260;
-    private const double MinCardHeight = 180;
+    private const double MinCardHeight = 80;
 
     private readonly ObservableCollection<DashboardBoxModel> _visibleBoxes = new();
     private readonly List<DashboardBoxModel> _allBoxes = new();
@@ -375,7 +375,7 @@ public partial class MainWindow : Window
 
     private DashboardBoxModel CreateBox(string id, string title, FrameworkElement content)
     {
-        var model = new DashboardBoxModel { Id = id, Title = title };
+        var model = new DashboardBoxModel { Id = id, Title = title, Content = content };
         var mirrorBinding = new Binding(nameof(DashboardBoxModel.IsMirrored)) { Source = model, Mode = BindingMode.OneWay };
         if (content is Controls.SidePanel sidePanel)
         {
@@ -553,10 +553,15 @@ public partial class MainWindow : Window
             Content = content
         };
 
-        var body = new DockPanel();
-        DockPanel.SetDock(titleBar, Dock.Top);
-        body.Children.Add(titleBar);
+        // 제목줄은 배치 높이를 차지하지 않고 박스 위에 표시해 내용 위치를 고정한다.
+        var body = new Grid();
         body.Children.Add(scroller);
+        titleBar.VerticalAlignment = VerticalAlignment.Top;
+        var titleBarOffset = new TranslateTransform();
+        titleBar.RenderTransform = titleBarOffset;
+        titleBar.SizeChanged += (_, e) => titleBarOffset.Y = -e.NewSize.Height;
+        Panel.SetZIndex(titleBar, 1);
+        body.Children.Add(titleBar);
 
         // 우측 하단 리사이즈 그립: 드래그로 카드 크기 직접 조절(자동맞춤 대신 수동).
         var grip = new Border
@@ -662,6 +667,25 @@ public partial class MainWindow : Window
             Child = cardGrid
         };
 
+        var titleBarStyle = new Style(typeof(Border));
+        titleBarStyle.Setters.Add(new Setter(VisibilityProperty, Visibility.Collapsed));
+        foreach (var propertyName in new[] { nameof(IsMouseOver), nameof(IsMouseCaptureWithin) })
+        {
+            var showTitle = new DataTrigger
+            {
+                Binding = new Binding(propertyName) { Source = card },
+                Value = true
+            };
+            showTitle.Setters.Add(new Setter(VisibilityProperty, Visibility.Visible));
+            titleBarStyle.Triggers.Add(showTitle);
+        }
+        titleBar.Style = titleBarStyle;
+        Debug.Assert(titleBarStyle.Triggers.Count == 2);
+        card.MouseEnter += (_, _) =>
+        {
+            if (IsLayoutEditable) BringToFront(model);
+        };
+
         // 카드 어디를 클릭하든(제목바/본문/그립 상관없이) 맨 앞으로 — 나중에 만든 박스가 항상
         // 위에 있던 문제 수정. PreviewMouseLeftButtonDown은 titleBar/grip의 개별 핸들러보다
         // 먼저 도는 터널링 이벤트라 e.Handled 안 건드리면 기존 드래그/선택 동작에 영향 없음.
@@ -682,9 +706,8 @@ public partial class MainWindow : Window
 
     private double GetMaxCardWidth()
     {
-        // 목록을 접어도 펼쳤을 때의 작업 영역 폭을 기준으로 한다.
-        var sidebarReserve = _sidebarExpanded ? 0 : _sidebarExpandedWidth + SidebarWidthSplitter.Width;
-        return Math.Max(0, BoxesScrollViewer.ViewportWidth - sidebarReserve
+        // 목록 표시 여부에 따라 달라지는 현재 작업 영역 폭을 그대로 사용한다.
+        return Math.Max(0, BoxesScrollViewer.ViewportWidth
             - BoxesPanel.Margin.Left - BoxesPanel.Margin.Right);
     }
 
@@ -699,7 +722,16 @@ public partial class MainWindow : Window
             // 가로 폭은 유지하고 내부 스크롤 영역까지 전체 내용의 높이를 측정한다.
             card.Height = double.NaN;
             card.Measure(new Size(card.Width, double.PositiveInfinity));
-            contentHeight = Math.Ceiling(card.DesiredSize.Height);
+            if (model.Content is Controls.DefectThumbGrid thumbnails)
+            {
+                var borderThickness = ((Border)card).BorderThickness;
+                var contentWidth = Math.Max(1, card.Width - borderThickness.Left - borderThickness.Right - SystemParameters.VerticalScrollBarWidth);
+                contentHeight = thumbnails.GetMinimumRowHeight(contentWidth) + borderThickness.Top + borderThickness.Bottom;
+            }
+            else
+            {
+                contentHeight = Math.Ceiling(card.DesiredSize.Height);
+            }
         }
         finally
         {
@@ -1202,6 +1234,7 @@ public partial class MainWindow : Window
         public string Id { get; init; } = "";
         public string Title { get; init; } = "";
         public UIElement? Card { get; set; }
+        public FrameworkElement? Content { get; init; }
 
         public bool IsMirrored
         {

@@ -7,6 +7,15 @@ using LineMonitor.Core.Models;
 
 namespace LineMonitor.App.Converters;
 
+public sealed class OutOfSpecBrushConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value is true ? Brushes.Red : parameter as Brush ?? DependencyProperty.UnsetValue;
+
+    public object ConvertBack(object value, Type targetType, object? parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
 /// <summary>표시용 데이터만 반전하고 DB의 레인 번호와 좌우 값은 변경하지 않는다.</summary>
 public sealed class MirrorMeasurementConverter : IMultiValueConverter
 {
