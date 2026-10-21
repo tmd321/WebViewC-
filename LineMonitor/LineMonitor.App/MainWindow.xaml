@@ -235,23 +235,6 @@
             <Border Grid.Column="1" x:Name="SidebarContent" Background="{StaticResource SidebarBgBrush}">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Margin="14,16,14,10">
-                        <Button Click="OnMirrorMeasurementsClick" Margin="-10,0,0,12" Padding="10,6"
-                                HorizontalAlignment="Left"
-                                IsEnabled="{Binding IsLayoutEditable, RelativeSource={RelativeSource AncestorType=Window}}"
-                                ToolTip="TOP·BACK 측정과 Wet·Dry 미스매치의 레인 및 좌우 값을 함께 반전합니다.">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource LayoutPresetTab}">
-                                    <Setter Property="Content" Value="좌우 반전: 꺼짐" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsMeasurementMirrored, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                                            <Setter Property="Content" Value="좌우 반전: 켜짐" />
-                                            <Setter Property="Background" Value="#DCEBFF" />
-                                            <Setter Property="Foreground" Value="#17365D" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
                         <TextBlock Text="목록" FontSize="17" FontWeight="SemiBold" />
                         <TextBlock Text="작업 영역으로 드래그하거나 더블클릭해서 추가" Style="{StaticResource MutedText}" Margin="0,2,0,0" />
                     </StackPanel>

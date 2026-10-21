@@ -42,7 +42,8 @@
         </Border.DataContext>
         <StackPanel>
             <!-- DS Lane1 ... TOP/BACK ... LaneN OS -->
-            <Grid Margin="0,0,0,6">
+            <Grid x:Name="MeasurementTitleArea" Margin="0,0,0,6" Background="Transparent"
+                  ToolTip="더블클릭해서 이 측정 화면의 좌우 방향을 반전합니다.">
                 <Grid.Style>
                     <Style TargetType="Grid">
                         <Setter Property="FlowDirection" Value="LeftToRight" />

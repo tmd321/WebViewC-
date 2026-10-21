@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -35,15 +36,6 @@ public partial class MainWindow : Window
     {
         get => (bool)GetValue(IsLayoutEditableProperty);
         private set => SetValue(IsLayoutEditableProperty, value);
-    }
-
-    public static readonly DependencyProperty IsMeasurementMirroredProperty = DependencyProperty.Register(
-        nameof(IsMeasurementMirrored), typeof(bool), typeof(MainWindow), new PropertyMetadata(false));
-
-    public bool IsMeasurementMirrored
-    {
-        get => (bool)GetValue(IsMeasurementMirroredProperty);
-        private set => SetValue(IsMeasurementMirroredProperty, value);
     }
 
     private static readonly string LayoutDirectory = Path.Combine(
@@ -240,10 +232,16 @@ public partial class MainWindow : Window
         Debug.Assert(CatalogList.IsEnabled == IsLayoutEditable && SizeMatchControls.IsEnabled == IsLayoutEditable);
     }
 
-    private void OnMirrorMeasurementsClick(object sender, RoutedEventArgs e)
+    private void OnMeasurementTitleMouseLeftButtonDown(DashboardBoxModel model, MouseButtonEventArgs e)
     {
-        if (!IsLayoutEditable) return;
-        IsMeasurementMirrored = !IsMeasurementMirrored;
+        if (e.ClickCount != 2 || !IsLayoutEditable || DataContext is not MainViewModel viewModel) return;
+        e.Handled = true;
+        if (MessageBox.Show(this, "좌우 반전 하시겠습니까?", $"{model.Title} 좌우 반전",
+                MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+
+        model.IsMirrored = !model.IsMirrored;
+        Debug.Assert(CaptureLayoutState().Mirrored[model.Id] == model.IsMirrored);
+        SaveLayout(viewModel);
     }
 
     private void ToggleMaximize()
@@ -357,22 +355,18 @@ public partial class MainWindow : Window
         RestoreSavedLayout(vm);
     }
 
-    private FrameworkElement BindControl(FrameworkElement control, object source, string path)
+    private static FrameworkElement BindControl(FrameworkElement control, object source, string path)
     {
         if (control is Controls.SidePanel sidePanel)
         {
             sidePanel.SetBinding(Controls.SidePanel.ShowInsulationProperty,
                 new Binding(nameof(MainViewModel.ShowInsulation)) { Source = source });
-            sidePanel.SetBinding(Controls.SidePanel.IsMirroredProperty,
-                new Binding(nameof(IsMeasurementMirrored)) { Source = this });
         }
 
         if (control is Controls.MismatchPanel mismatchPanel)
         {
             mismatchPanel.SetBinding(Controls.MismatchPanel.IsCathodeElectrodeProperty,
                 new Binding(nameof(MainViewModel.ShowInsulation)) { Source = source });
-            mismatchPanel.SetBinding(Controls.MismatchPanel.IsMirroredProperty,
-                new Binding(nameof(IsMeasurementMirrored)) { Source = this });
         }
 
         control.SetBinding(DataContextProperty, new Binding(path) { Source = source });
@@ -382,6 +376,17 @@ public partial class MainWindow : Window
     private DashboardBoxModel CreateBox(string id, string title, FrameworkElement content)
     {
         var model = new DashboardBoxModel { Id = id, Title = title };
+        var mirrorBinding = new Binding(nameof(DashboardBoxModel.IsMirrored)) { Source = model, Mode = BindingMode.OneWay };
+        if (content is Controls.SidePanel sidePanel)
+        {
+            sidePanel.SetBinding(Controls.SidePanel.IsMirroredProperty, mirrorBinding);
+            sidePanel.MeasurementTitleArea.MouseLeftButtonDown += (_, e) => OnMeasurementTitleMouseLeftButtonDown(model, e);
+        }
+        else if (content is Controls.MismatchPanel mismatchPanel)
+        {
+            mismatchPanel.SetBinding(Controls.MismatchPanel.IsMirroredProperty, mirrorBinding);
+            mismatchPanel.MeasurementTitleArea.MouseLeftButtonDown += (_, e) => OnMeasurementTitleMouseLeftButtonDown(model, e);
+        }
         model.Card = BuildCard(model, content);
         return model;
     }
@@ -1041,7 +1046,6 @@ public partial class MainWindow : Window
     private void ResetLayout()
     {
         EndBoxSelection();
-        IsMeasurementMirrored = false;
         ClearSelection();
         _visibleBoxes.Clear();
         _nextZIndex = 1;
@@ -1049,6 +1053,7 @@ public partial class MainWindow : Window
         for (var i = 0; i < _allBoxes.Count; i++)
         {
             var box = _allBoxes[i];
+            box.IsMirrored = false;
             box.IsPlaced = false;
             box.X = 20 + (i % 3) * (DefaultCardWidth + 20);
             box.Y = 20 + (i / 3) * (DefaultCardHeight + 20);
@@ -1080,8 +1085,6 @@ public partial class MainWindow : Window
                 return;
             }
 
-            IsMeasurementMirrored = state.IsMeasurementMirrored;
-
             // 기본값은 "전부 안 놓임" — 저장돼있던 Visible 목록에 있는 것만 캔버스에 되돌려놓음.
             foreach (var id in state.Visible)
             {
@@ -1096,6 +1099,8 @@ public partial class MainWindow : Window
 
             foreach (var box in _allBoxes)
             {
+                box.IsMirrored = state.Mirrored.TryGetValue(box.Id, out var mirrored)
+                    ? mirrored : state.IsMeasurementMirrored ?? false;
                 if (state.X.TryGetValue(box.Id, out var x))
                 {
                     box.X = x;
@@ -1151,7 +1156,7 @@ public partial class MainWindow : Window
 
     private LayoutState CaptureLayoutState() => new()
     {
-        IsMeasurementMirrored = IsMeasurementMirrored,
+        Mirrored = _allBoxes.ToDictionary(box => box.Id, box => box.IsMirrored),
         Visible = _allBoxes.Where(b => b.IsPlaced).Select(b => b.Id).ToList(),
         X = _allBoxes.ToDictionary(b => b.Id, b => b.X),
         Y = _allBoxes.ToDictionary(b => b.Id, b => b.Y),
@@ -1189,6 +1194,7 @@ public partial class MainWindow : Window
     private sealed class DashboardBoxModel : INotifyPropertyChanged
     {
         private bool _isPlaced;
+        private bool _isMirrored;
         private double _x;
         private double _y;
         private int _zIndex;
@@ -1196,6 +1202,12 @@ public partial class MainWindow : Window
         public string Id { get; init; } = "";
         public string Title { get; init; } = "";
         public UIElement? Card { get; set; }
+
+        public bool IsMirrored
+        {
+            get => _isMirrored;
+            set => SetField(ref _isMirrored, value);
+        }
 
         /// <summary>크기 맞춤 기준(마지막 Ctrl+클릭) 표시 배지 — RefreshSelectionVisual이 Visibility 토글.</summary>
         public UIElement? AnchorBadge { get; set; }
@@ -1243,7 +1255,10 @@ public partial class MainWindow : Window
 
     private sealed class LayoutState
     {
-        public bool IsMeasurementMirrored { get; set; }
+        // 기존 전체 반전 설정은 복원할 때만 개별 값으로 이어받고 새 파일에는 기록하지 않는다.
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? IsMeasurementMirrored { get; set; }
+        public Dictionary<string, bool> Mirrored { get; set; } = new();
         public List<string> Visible { get; set; } = new();
         public Dictionary<string, double> X { get; set; } = new();
         public Dictionary<string, double> Y { get; set; } = new();
