@@ -409,35 +409,27 @@ public partial class MainWindow : Window
         titleStack.Children.Add(titleText);
         titleStack.Children.Add(anchorBadge);
 
-        Border card = null!; // BuildCard 끝에서 채워짐 — 아래 클로저들이 참조함(가로/세로 맞춤, 리사이즈 그립)
+        Border card = null!; // BuildCard 끝에서 채워짐 — 아래 클로저들이 참조함(기본 크기 맞춤, 리사이즈 그립)
 
-        var fitWidthButton = new Button
+        // 기본 크기 = 가로 최대 너비 + 세로 스크롤 없는 최소 높이 (자동정렬의 박스 한 개 버전, 위치는 그대로).
+        var fitDefaultButton = new Button
         {
-            Content = "⇔",
+            Content = "⤢",
             Width = 22,
             Height = 22,
             Padding = new Thickness(0),
             FontSize = 15,
             VerticalAlignment = VerticalAlignment.Center,
-            ToolTip = "가로 최대 너비에 맞춤"
+            ToolTip = "기본 크기로 맞춤 (가로 최대 너비, 세로는 스크롤 없이 내용에 맞춘 최소 높이)"
         };
-        fitWidthButton.Click += (_, _) =>
+        fitDefaultButton.Click += (_, _) =>
         {
             var maxWidth = GetMaxCardWidth();
             if (maxWidth > 0) ResizeBox(model, maxWidth, card.Height);
+            // 자동정렬과 같이 바뀐 너비로 배치를 끝낸 뒤 높이를 잰다.
+            BoxesScrollViewer.UpdateLayout();
+            FitBoxHeight(model);
         };
-
-        var fitHeightButton = new Button
-        {
-            Content = "⇕",
-            Width = 22,
-            Height = 22,
-            Padding = new Thickness(0),
-            FontSize = 15,
-            VerticalAlignment = VerticalAlignment.Center,
-            ToolTip = "세로 스크롤 없이 내용에 맞춰 최소 높이로"
-        };
-        fitHeightButton.Click += (_, _) => FitBoxHeight(model);
 
         var closeButton = new Button
         {
@@ -455,14 +447,11 @@ public partial class MainWindow : Window
         titleGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         titleGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         titleGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        titleGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         Grid.SetColumn(titleStack, 0);
-        Grid.SetColumn(fitWidthButton, 1);
-        Grid.SetColumn(fitHeightButton, 2);
-        Grid.SetColumn(closeButton, 3);
+        Grid.SetColumn(fitDefaultButton, 1);
+        Grid.SetColumn(closeButton, 2);
         titleGrid.Children.Add(titleStack);
-        titleGrid.Children.Add(fitWidthButton);
-        titleGrid.Children.Add(fitHeightButton);
+        titleGrid.Children.Add(fitDefaultButton);
         titleGrid.Children.Add(closeButton);
 
         var titleBar = new Border
