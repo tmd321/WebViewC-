@@ -91,10 +91,42 @@ public partial class MainWindow : Window
         Loaded += OnLoaded;
         Closing += OnClosing;
         PreviewMouseDown += OnWindowPreviewMouseDown;
+        PreviewKeyDown += OnWindowPreviewKeyDown;
+    }
+
+    // 터널링 PreviewKeyDown이라 창 안 어디에 포커스가 있든(사이드바·표·버튼) 먼저 받는다.
+    // 입력란이 있는 이력조회 화면은 제외해 Ctrl+A/Delete가 텍스트 편집에 그대로 쓰이게 한다.
+    private void OnWindowPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (!IsLayoutEditable || _isHistoryView) return;
+
+        if (e.Key == Key.A && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            // 기준(마지막 Ctrl+클릭) 박스는 그대로 두고 나머지만 선택에 더한다.
+            foreach (var model in _visibleBoxes)
+            {
+                _selection.Add(model);
+                RefreshSelectionVisual(model);
+            }
+            UpdateSizeMatchButtonsEnabled();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Delete && Keyboard.Modifiers == ModifierKeys.None && _selection.Count > 0)
+        {
+            foreach (var model in _selection.ToList())
+            {
+                CloseBox(model);
+            }
+            Debug.Assert(_selection.Count == 0 && _selectionAnchor is null);
+            e.Handled = true;
+        }
     }
 
     private void OnWindowPreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
+        // 포커스를 받는 요소가 없는 곳(빈 작업 영역, 카드 제목바)만 눌렀으면 키 입력이 창으로 오지 않으므로 창에 포커스를 둔다.
+        if (!_isHistoryView && !IsKeyboardFocusWithin) Focus();
+
         if (_selection.Count == 0) return;
 
         for (var current = e.OriginalSource as DependencyObject; current is not null;
@@ -344,6 +376,8 @@ public partial class MainWindow : Window
         CatalogList.ItemsSource = _allBoxes;
         ResetLayout();
         RestoreSavedLayout(vm);
+        // 시작 직후 아무것도 클릭하지 않아도 Ctrl+A/Delete가 먹도록 창에 포커스를 둔다.
+        Focus();
     }
 
     private static FrameworkElement BindControl(FrameworkElement control, object source, string path)
@@ -756,6 +790,8 @@ public partial class MainWindow : Window
             _selectionAnchor = null;
         }
 
+        // 선택 테두리를 지워 둬야 사이드바에서 다시 추가했을 때 선택된 것처럼 보이지 않는다.
+        RefreshSelectionVisual(model);
         UpdateSizeMatchButtonsEnabled();
     }
 
