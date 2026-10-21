@@ -101,11 +101,8 @@ public partial class MainWindow : Window
              current = current is Visual ? VisualTreeHelper.GetParent(current) : LogicalTreeHelper.GetParent(current))
         {
             if (_visibleBoxes.Any(box => ReferenceEquals(box.Card, current))) return;
-            // 크기 맞춤 버튼은 현재 선택을 사용하므로 해제하지 않는다.
-            if (ReferenceEquals(current, MatchWidthButton)
-                || ReferenceEquals(current, MatchHeightButton)
-                || ReferenceEquals(current, MatchBothButton)
-                || ReferenceEquals(current, AutoArrangeButton)) return;
+            // 자동정렬 버튼은 현재 선택을 사용하므로 해제하지 않는다.
+            if (ReferenceEquals(current, AutoArrangeButton)) return;
         }
 
         ClearSelection();
@@ -478,7 +475,7 @@ public partial class MainWindow : Window
         titleBar.SetBinding(IsEnabledProperty, new Binding(nameof(IsLayoutEditable)) { Source = this });
 
         // 제목바 드래그 = 선택된 박스들을 같은 이동량으로 함께 이동.
-        // Ctrl+클릭이면 이동 대신 다중 선택 토글(MFC 다이얼로그 에디터처럼) — "크기 맞춤" 버튼들이 이 선택을 씀.
+        // Ctrl+클릭이면 이동 대신 다중 선택 토글(MFC 다이얼로그 에디터처럼) — 자동정렬 버튼이 이 선택을 씀.
         Point? moveStart = null;
         var moveStartPositions = new Dictionary<DashboardBoxModel, Point>();
         titleBar.MouseLeftButtonDown += (_, e) =>
@@ -837,18 +834,8 @@ public partial class MainWindow : Window
 
     private void UpdateSizeMatchButtonsEnabled()
     {
-        var enabled = _selection.Count >= 2 && _selectionAnchor is not null;
-        MatchWidthButton.IsEnabled = enabled;
-        MatchHeightButton.IsEnabled = enabled;
-        MatchBothButton.IsEnabled = enabled;
         AutoArrangeButton.IsEnabled = IsLayoutEditable && _selection.Count > 0;
     }
-
-    private void OnMatchWidthClick(object sender, RoutedEventArgs e) => ApplySizeMatch(matchWidth: true, matchHeight: false);
-
-    private void OnMatchHeightClick(object sender, RoutedEventArgs e) => ApplySizeMatch(matchWidth: false, matchHeight: true);
-
-    private void OnMatchBothClick(object sender, RoutedEventArgs e) => ApplySizeMatch(matchWidth: true, matchHeight: true);
 
     private void OnAutoArrangeClick(object sender, RoutedEventArgs e)
     {
@@ -883,31 +870,6 @@ public partial class MainWindow : Window
         BoxesScrollViewer.ScrollToLeftEnd();
         BoxesScrollViewer.ScrollToTop();
         if (DataContext is MainViewModel viewModel) SaveLayout(viewModel);
-    }
-
-    private void ApplySizeMatch(bool matchWidth, bool matchHeight)
-    {
-        if (!IsLayoutEditable) return;
-        if (_selectionAnchor is not { } anchor || anchor.Card is not FrameworkElement anchorFe || _selection.Count < 2)
-        {
-            return;
-        }
-
-        foreach (var model in _selection)
-        {
-            if (model == anchor || model.Card is not FrameworkElement fe)
-            {
-                continue;
-            }
-
-            if (matchWidth)
-            {
-                MoveBox(model, anchor.X, model.Y);
-            }
-
-            ResizeBox(model, matchWidth ? anchorFe.ActualWidth : fe.Width,
-                matchHeight ? anchorFe.ActualHeight : fe.Height);
-        }
     }
 
     private void OnCatalogItemMouseDoubleClick(object sender, MouseButtonEventArgs e)

@@ -126,17 +126,10 @@
                             Click="OnLayoutLockClick" ToolTip="박스 이동·크기 변경·추가·삭제를 잠급니다." />
                 </StackPanel>
 
-                <!-- Ctrl+클릭으로 박스 여러 개 고른 뒤 마지막으로 고른 박스 크기에 맞춤(MFC "동일하게" 기능) -->
+                <!-- Ctrl+클릭 또는 드래그 사각형으로 고른 박스를 자동정렬 -->
                 <StackPanel x:Name="SizeMatchControls" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
-                    <TextBlock Text="크기 맞춤: " VerticalAlignment="Center" Style="{StaticResource MutedText}" Margin="0,0,6,0" />
-                    <Button x:Name="MatchWidthButton" Content="가로" Style="{StaticResource PillButton}" Padding="10,4"
-                            Margin="0,0,4,0" IsEnabled="False" Click="OnMatchWidthClick" ToolTip="기준 박스의 너비와 왼쪽 위치에 맞춤" />
-                    <Button x:Name="MatchHeightButton" Content="세로" Style="{StaticResource PillButton}" Padding="10,4"
-                            Margin="0,0,4,0" IsEnabled="False" Click="OnMatchHeightClick" ToolTip="마지막으로 고른 박스 세로에 맞춤" />
-                    <Button x:Name="MatchBothButton" Content="가로+세로" Style="{StaticResource PillButton}" Padding="10,4"
-                            IsEnabled="False" Click="OnMatchBothClick" ToolTip="기준 박스의 크기와 왼쪽 위치에 맞춤" />
                     <Button x:Name="AutoArrangeButton" Content="자동정렬" Style="{StaticResource PillButton}" Padding="10,4"
-                            Margin="4,0,0,0" IsEnabled="False" Click="OnAutoArrangeClick"
+                            IsEnabled="False" Click="OnAutoArrangeClick"
                             ToolTip="선택한 박스를 최대 너비와 세로 기본크기로 맞추고 위에서부터 빈틈없이 정렬합니다." />
                 </StackPanel>
 
