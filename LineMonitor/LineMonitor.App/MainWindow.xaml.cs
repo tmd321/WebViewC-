@@ -328,13 +328,6 @@ public partial class MainWindow : Window
     {
         var vm = (MainViewModel)DataContext;
 
-        BoxesScrollViewer.ApplyTemplate();
-        if (BoxesScrollViewer.Template.FindName("PART_VerticalScrollBar", BoxesScrollViewer) is FrameworkElement verticalScrollBar)
-        {
-            verticalScrollBar.Width = 24;
-            verticalScrollBar.MinWidth = 24;
-        }
-
         _allBoxes.Add(CreateBox("TopMeasurement", "TOP 측정",
             BindControl(new Controls.SidePanel { Title = "TOP" }, vm, "LiveOverview.TopMeasurement")));
         _allBoxes.Add(CreateBox("BackMeasurement", "BACK 측정",

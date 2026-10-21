@@ -279,6 +279,12 @@
                               MouseLeftButtonUp="OnBoxesSelectionMouseUp"
                               LostMouseCapture="OnBoxesSelectionLostMouseCapture"
                               AllowDrop="True" DragOver="OnCanvasDragOver" Drop="OnCanvasDrop">
+                        <ScrollViewer.Resources>
+                            <Style TargetType="{x:Type ScrollBar}">
+                                <Setter Property="Width" Value="15"/>
+                                <Setter Property="MinWidth" Value="10"/>
+                            </Style>
+                        </ScrollViewer.Resources>
                     <ItemsControl x:Name="BoxesPanel" Margin="8,40,8,8" Grid.IsSharedSizeScope="True" Background="Transparent"
                                   ItemsPanel="{StaticResource DashboardBoxesPanel}">
                         <ItemsControl.ItemContainerStyle>
