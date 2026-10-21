@@ -63,7 +63,6 @@ public partial class MainWindow : Window
     private Point? _selectionDragStart;
 
     private readonly HashSet<DashboardBoxModel> _selection = new();
-    private DashboardBoxModel? _selectionAnchor;
     private int _nextZIndex = 1;
 
     public MainWindow() : this(1, false)
@@ -102,7 +101,6 @@ public partial class MainWindow : Window
 
         if (e.Key == Key.A && Keyboard.Modifiers == ModifierKeys.Control)
         {
-            // 기준(마지막 Ctrl+클릭) 박스는 그대로 두고 나머지만 선택에 더한다.
             foreach (var model in _visibleBoxes)
             {
                 _selection.Add(model);
@@ -117,7 +115,7 @@ public partial class MainWindow : Window
             {
                 CloseBox(model);
             }
-            Debug.Assert(_selection.Count == 0 && _selectionAnchor is null);
+            Debug.Assert(_selection.Count == 0);
             e.Handled = true;
         }
     }
@@ -225,7 +223,6 @@ public partial class MainWindow : Window
                 _selection.Add(model);
             }
         }
-        _selectionAnchor = _visibleBoxes.LastOrDefault(model => _selection.Contains(model));
         foreach (var model in _visibleBoxes) RefreshSelectionVisual(model);
         UpdateSizeMatchButtonsEnabled();
         Debug.Assert(_selection.All(model => model.Card is FrameworkElement card
@@ -426,23 +423,6 @@ public partial class MainWindow : Window
             Foreground = (Brush)Application.Current.Resources["TextBrush"]
         };
 
-        // 크기 맞춤 기준(마지막 Ctrl+클릭한 박스)일 때만 보이는 배지 — RefreshSelectionVisual이 토글.
-        var anchorBadge = new TextBlock
-        {
-            Text = "기준",
-            FontSize = 14,
-            FontWeight = FontWeights.Bold,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(6, 0, 0, 0),
-            Foreground = (Brush)Application.Current.Resources["WarnBrush"],
-            Visibility = Visibility.Collapsed
-        };
-        model.AnchorBadge = anchorBadge;
-
-        var titleStack = new StackPanel { Orientation = Orientation.Horizontal };
-        titleStack.Children.Add(titleText);
-        titleStack.Children.Add(anchorBadge);
-
         Border card = null!; // BuildCard 끝에서 채워짐 — 아래 클로저들이 참조함(기본 크기 맞춤, 리사이즈 그립)
 
         // 기본 크기 = 가로 최대 너비 + 세로 스크롤 없는 최소 높이 (자동정렬의 박스 한 개 버전, 위치는 그대로).
@@ -481,10 +461,10 @@ public partial class MainWindow : Window
         titleGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         titleGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         titleGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        Grid.SetColumn(titleStack, 0);
+        Grid.SetColumn(titleText, 0);
         Grid.SetColumn(fitDefaultButton, 1);
         Grid.SetColumn(closeButton, 2);
-        titleGrid.Children.Add(titleStack);
+        titleGrid.Children.Add(titleText);
         titleGrid.Children.Add(fitDefaultButton);
         titleGrid.Children.Add(closeButton);
 
@@ -498,13 +478,13 @@ public partial class MainWindow : Window
         titleBar.SetBinding(IsEnabledProperty, new Binding(nameof(IsLayoutEditable)) { Source = this });
 
         // 제목바 드래그 = 선택된 박스들을 같은 이동량으로 함께 이동.
-        // Ctrl+클릭이면 이동 대신 다중 선택 토글(MFC 다이얼로그 에디터처럼) — 자동정렬 버튼이 이 선택을 씀.
+        // Ctrl+클릭 또는 더블클릭이면 이동 대신 다중 선택 토글(MFC 다이얼로그 에디터처럼) — 자동정렬 버튼이 이 선택을 씀.
         Point? moveStart = null;
         var moveStartPositions = new Dictionary<DashboardBoxModel, Point>();
         titleBar.MouseLeftButtonDown += (_, e) =>
         {
             if (!IsLayoutEditable) return;
-            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control) || e.ClickCount == 2)
             {
                 ToggleSelection(model);
                 e.Handled = true;
@@ -785,10 +765,6 @@ public partial class MainWindow : Window
         _visibleBoxes.Remove(model);
         model.IsPlaced = false;
         _selection.Remove(model);
-        if (_selectionAnchor == model)
-        {
-            _selectionAnchor = null;
-        }
 
         // 선택 테두리를 지워 둬야 사이드바에서 다시 추가했을 때 선택된 것처럼 보이지 않는다.
         RefreshSelectionVisual(model);
@@ -798,30 +774,13 @@ public partial class MainWindow : Window
     private void ToggleSelection(DashboardBoxModel model)
     {
         if (!IsLayoutEditable) return;
-        var previousAnchor = _selectionAnchor;
 
-        if (_selection.Contains(model))
-        {
-            _selection.Remove(model);
-            if (_selectionAnchor == model)
-            {
-                // 기준이었던 박스를 해제하면 기준도 같이 사라짐 — 남은 것 중 하나를 임의로
-                // 승격시키지 않음(헷갈림 방지). 다시 Ctrl+클릭해서 새 기준 지정하면 됨.
-                _selectionAnchor = null;
-            }
-        }
-        else
+        if (!_selection.Remove(model))
         {
             _selection.Add(model);
-            _selectionAnchor = model; // 마지막으로 Ctrl+클릭한 박스가 크기 맞춤 기준(주황 테두리+"기준" 배지).
         }
 
         RefreshSelectionVisual(model);
-        if (previousAnchor is not null && previousAnchor != _selectionAnchor)
-        {
-            RefreshSelectionVisual(previousAnchor); // 기준이 바뀌었으니 이전 기준 박스는 일반 선택 표시로 되돌림.
-        }
-
         UpdateSizeMatchButtonsEnabled();
     }
 
@@ -829,7 +788,6 @@ public partial class MainWindow : Window
     {
         var affected = _selection.ToList();
         _selection.Clear();
-        _selectionAnchor = null;
         foreach (var model in affected)
         {
             RefreshSelectionVisual(model);
@@ -846,15 +804,8 @@ public partial class MainWindow : Window
         }
 
         var isSelected = _selection.Contains(model);
-        var isAnchor = isSelected && model == _selectionAnchor;
-
-        card.BorderBrush = (Brush)Application.Current.Resources[isAnchor ? "WarnBrush" : isSelected ? "AccentBrush" : "BorderBrush2"];
-        card.BorderThickness = new Thickness(isAnchor ? 3 : isSelected ? 2 : 1);
-
-        if (model.AnchorBadge is UIElement badge)
-        {
-            badge.Visibility = isAnchor ? Visibility.Visible : Visibility.Collapsed;
-        }
+        card.BorderBrush = (Brush)Application.Current.Resources[isSelected ? "AccentBrush" : "BorderBrush2"];
+        card.BorderThickness = new Thickness(isSelected ? 2 : 1);
     }
 
     private void UpdateSizeMatchButtonsEnabled()
@@ -1259,8 +1210,6 @@ public partial class MainWindow : Window
             set => SetField(ref _isMirrored, value);
         }
 
-        /// <summary>크기 맞춤 기준(마지막 Ctrl+클릭) 표시 배지 — RefreshSelectionVisual이 Visibility 토글.</summary>
-        public UIElement? AnchorBadge { get; set; }
 
         /// <summary>작업 영역에 지금 놓여있는지 — true면 사이드바 카탈로그 행은 흐리게 표시되고 다시 못 눌림.</summary>
         public bool IsPlaced
